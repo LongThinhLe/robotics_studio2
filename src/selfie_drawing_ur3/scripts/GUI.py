@@ -255,8 +255,8 @@ class SelfieDrawingApp:
         self.remove_background_image()
         self.trace_outline()
 
-    # def generate_gcode(self):
-        
+    def generate_gcode(self):
+        print("ok")
 
     #-------------------- Remove Background and Display Function
 
