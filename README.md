@@ -25,36 +25,44 @@ Users can immerse themselves in a unique experience by sitting in front of a 108
 
 1. Create a workspace folder in your terminal
 
-`$ mkdir -p rs2_ws`
+  `$ mkdir -p rs2_ws`
+
 
 
 2. Navigate to your Workspace
 
-`$ cd ~/rs2_ws`
+  `$ cd ~/rs2_ws`
+
+
 
 3. Clone the Repository
 
-`$ git clone https://github.com/LongThinhLe/robotics_studio2.git`
+  `$ git clone https://github.com/LongThinhLe/robotics_studio2.git`
+
 
 
 4. Build the project and source it
 
-`$ cd ~/rs2_ws/robotics_studio2`
+  `$ cd ~/rs2_ws/robotics_studio2`
 
-`$ catkin_make`
+  `$ catkin_make`
 
-`$ source devel/setup.bash`
+  `$ source devel/setup.bash`
+
+
 
 5. Navigate to **/src** folder
 
-`$ cd ~/rs2_ws/robotics_studio2/src/selfie_drawing_ur3/scripts`
+  `$ cd ~/rs2_ws/robotics_studio2/src/selfie_drawing_ur3/scripts`
+
 
 
 6. RUN the file GUI.py
 
-`$ python3 GUI.py`
+  `$ python3 GUI.py`
+
 
 
 7. If you don't have `python3` in your Linux, use:
 
-`$ pip install python3`
+  `$ pip install python3`
