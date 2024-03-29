@@ -27,21 +27,26 @@ Users can immerse themselves in a unique experience by sitting in front of a 108
 
 `mkdir -p rs2_ws`
 
+
 2. Navigate to your Workspace
 
 `cd ~/rs2_ws`
+
 
 3. Clone the Repository
 
 `git clone https://github.com/LongThinhLe/robotics_studio2.git`
 
+
 4. Navigate to **/src** folder
 
 `cd ~/rs2_ws/robotics_studio2/src/selfie_drawing_ur3/scripts`
 
+
 5. RUN the file GUI.py
 
 `python3 GUI.py`
+
 
 6. If you don't have `python3` in your Linux, use:
 
