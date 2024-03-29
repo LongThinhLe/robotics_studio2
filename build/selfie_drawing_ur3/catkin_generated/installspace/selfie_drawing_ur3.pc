@@ -1,0 +1,8 @@
+prefix=/home/lelongthinh/rs2_ws/install
+
+Name: selfie_drawing_ur3
+Description: Description of selfie_drawing_ur3
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

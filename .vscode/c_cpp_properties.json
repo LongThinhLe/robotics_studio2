@@ -1,0 +1,26 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/lelongthinh/catkin_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/lelongthinh/catkin_ws/src/pfms-ros/audibot/audibot_gazebo/include/**",
+        "/home/lelongthinh/catkin_ws/src/fetch_gazebo/fetch_gazebo/include/**",
+        "/home/lelongthinh/catkin_ws/src/pfms-ros/sjtu-drone/include/**",
+        "/home/lelongthinh/catkin_ws/src/universal_robot/ur_kinematics/include/**",
+        "/home/lelongthinh/catkin_ws/src/usb_cam/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

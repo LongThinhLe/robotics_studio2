@@ -1,0 +1,2 @@
+selfie_drawing_ur3
+-DCATKIN_DEVEL_PREFIX=/home/lelongthinh/rs2_ws/devel -DCMAKE_INSTALL_PREFIX=/home/lelongthinh/rs2_ws/install -G Unix Makefiles
