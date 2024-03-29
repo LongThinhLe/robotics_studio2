@@ -32,7 +32,6 @@ Users can immerse themselves in a unique experience by sitting in front of a 108
 
 `$ cd ~/rs2_ws`
 
-
 3. Clone the Repository
 
 `$ git clone https://github.com/LongThinhLe/robotics_studio2.git`
@@ -41,7 +40,9 @@ Users can immerse themselves in a unique experience by sitting in front of a 108
 4. Build the project and source it
 
 `$ cd ~/rs2_ws/robotics_studio2`
+
 `$ catkin_make`
+
 `$ source devel/setup.bash`
 
 5. Navigate to **/src** folder
