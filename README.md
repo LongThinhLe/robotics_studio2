@@ -19,3 +19,30 @@ Users can immerse themselves in a unique experience by sitting in front of a 108
 - **Robot Control**: (made by Long) The movement of the robot exhibits a seamless and impeccable flow, characterized by its smooth execution. This precision is maintained through the implementation of advanced features such as self-collision avoidance and singularities avoidance, ensuring that the robot navigates its environment without compromising its integrity. Furthermore, to achieve optimal drawing conditions, the paper is calibrated, using a depth camera, to ensure a level plane for drawing.
 
 - **GUI and Compliance**: (made by Dennis) The program facilitates calibration procedures for the easel, ensuring precise alignment and setup. Moreover, the end-effector boasts the capability to accommodate multiple tools simultaneously, enhancing versatility and efficiency. With the easel duly configured, the mechanical end-effector seamlessly integrates with it, featuring effective compliance mechanisms for optimal performance. Additionally, users are greeted with an intuitive graphical user interface (GUI), offering a user-friendly platform to initiate and navigate the program effortlessly, thereby streamlining the user experience and promoting accessibility.
+
+
+## Installation
+
+1. Create a workspace folder in your terminal
+
+`mkdir -p rs2_ws`
+
+2. Navigate to your Workspace
+
+`cd ~/rs2_ws`
+
+3. Clone the Repository
+
+`git clone https://github.com/LongThinhLe/robotics_studio2.git`
+
+4. Navigate to **/src** folder
+
+`cd ~/rs2_ws/robotics_studio2/src/selfie_drawing_ur3/scripts`
+
+5. RUN the file GUI.py
+
+`python3 GUI.py`
+
+6. If you don't have `python3` in your Linux, use:
+
+`pip install python3`
