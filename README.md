@@ -58,7 +58,7 @@ Users can immerse themselves in a unique experience by sitting in front of a 108
 
 6. Make the file to be executable
 
-   `$ chmod -x GUI.py`
+   `$ chmod +x GUI.py`
 
 
 
