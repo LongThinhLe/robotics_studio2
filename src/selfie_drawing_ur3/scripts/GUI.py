@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, Scale
 from tkinter.ttk import *
 
 from PIL import Image, ImageTk
@@ -11,6 +11,9 @@ from PIL import Image
 import svgpathtools as svg
 
 from image_processing import ImageProcessor
+
+import threading
+import time
 
 class SelfieDrawingApp:
 
@@ -47,7 +50,6 @@ class SelfieDrawingApp:
  
         # Initialize Icon for application
         self.init_icon()
-
 
 
     #-------------------- Init Icon App
@@ -147,27 +149,137 @@ class SelfieDrawingApp:
 
 
         #----------------------------------BUTTONS
+        # Create a frame to hold the additional buttons
+        countdown_frame = tk.Frame(self.tab_take_picture)
+        countdown_frame.grid(row=0, column=2, padx=10, pady=10, sticky='ns')
+
+        # Create a label for the countdown buttons
+        lbl_countdown = tk.Label(countdown_frame, text="Countdown Timer", font=("Arial", 20, "bold"))
+        lbl_countdown.grid(row=0, column=0, columnspan=4, pady=5)
+
+        
+        # Create buttons for 0, 3, 5, and 10 seconds
+        self.countdown_value = 0
+
+        self.btn_0_sec = tk.Button(countdown_frame, text="None", command=lambda: self.set_countdown(0), highlightthickness=1, highlightbackground="black")
+        self.btn_3_sec = tk.Button(countdown_frame, text="3s", command=lambda: self.set_countdown(3), highlightthickness=0, highlightbackground="black")
+        self.btn_5_sec = tk.Button(countdown_frame, text="5s", command=lambda: self.set_countdown(5), highlightthickness=0, highlightbackground="black")
+        self.btn_10_sec = tk.Button(countdown_frame, text="10s", command=lambda: self.set_countdown(10), highlightthickness=0, highlightbackground="black")
+
+        # Grid buttons in the countdown frame
+        self.btn_0_sec.grid(row=1, column=0, padx=5, pady=0)
+        self.btn_3_sec.grid(row=1, column=1, padx=5, pady=0)
+        self.btn_5_sec.grid(row=1, column=2, padx=5, pady=0)
+        self.btn_10_sec.grid(row=1, column=3, padx=5, pady=0)
+
+        # Bind click events to button animations
+        self.btn_0_sec.bind("<ButtonPress-1>", self.button_pressed)
+        self.btn_3_sec.bind("<ButtonPress-1>", self.button_pressed)
+        self.btn_5_sec.bind("<ButtonPress-1>", self.button_pressed)
+        self.btn_10_sec.bind("<ButtonPress-1>", self.button_pressed)
+
+
+
         # Create a frame to hold the buttons
         button_frame = tk.Frame(self.tab_take_picture)
-        button_frame.grid(row=0, column=2, padx=10, pady=10, sticky='ns')  # Adjust row and column as needed
+        button_frame.grid(row=1, column=2, padx=10, pady=10, sticky='ns')  # Adjust row and column as needed
+
+        # Create a label for the Function buttons
+        lbl_function_buttons = tk.Label(button_frame, text="Function Buttons", font=("Arial", 20, "bold"))
+        lbl_function_buttons.grid(row=0, column=0, pady=5)
 
         # Create the buttons for taking a picture and resetting
-        btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)  # Set width to fill available horizontal space
-        btn_process_img = tk.Button(button_frame, text="Process Image", command=lambda: self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image), width=15, height= 5)
-        btn__generate_gcode = tk.Button(button_frame, text="Generate Gcode", command=self.generate_gcode, width=15, height= 5)
+        # self.btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)
+        self.btn_capture = tk.Button(button_frame, text="Take Picture", width=15, height= 5)
+        btn_process_img = tk.Button(button_frame, text="Process Image", command=lambda: self.process_img(), width=15, height= 5)
+        btn_generate_gcode = tk.Button(button_frame, text="Generate Gcode", command=self.generate_gcode, width=15, height= 5)
 
-        btn_capture.grid(row=0, column=0, padx=10, pady=10, sticky='ew')  #
-        btn_process_img.grid(row=1, column=0, padx=10, pady=10, sticky='ew')  #
-        btn__generate_gcode.grid(row=2, column=0, padx=10, pady=10, sticky='ew')  #
+        self.btn_capture.grid(row=1, column=0, padx=10, pady=10, sticky='ew')  
+        btn_process_img.grid(row=2, column=0, padx=10, pady=10, sticky='ew')  
+        btn_generate_gcode.grid(row=3, column=0, padx=10, pady=10, sticky='ew') 
+
+        # Bind click events to button animations
+        self.btn_capture.bind("<ButtonPress-1>", self.button_pressed)
 
 
+        #----------------------------------Initialize
         # Initialize captured photo variable
         self.photo = None
 
-        # # Start the webcam preview
-        self.image_processor.update_preview(self.canvas_preview, screen_width, screen_height)
+        # Start the webcam preview
+        self.update_preview()
+
+
+    #-------------------- Threading for Timer
+
+    def init_countdown(self, duration, callback):
+        self.duration = duration
+        self.callback = callback # self.take_picture()
+        self.timer_thread = None
+        self.running = False
+    
+    def start_countdown(self):
+        self.running = True
+        self.timer_thread = threading.Thread(target=self._run_timer)
+        self.timer_thread.start()
+
+    def stop(self):
+        self.running = False
+
+    def _run_timer(self):
+        count = self.duration
+        while count >= 0 and self.running:
+            print(f"Countdown now: {count}")
+            time.sleep(1)  # Sleep for 1 second
+            count -= 1
+
+        if self.running:
+            if self.callback:
+                self.callback()
+                self.stop()
+
+    def set_countdown(self,seconds):
+        self.countdown_value = seconds
+
 
     #-------------------- Button Event Function
+    def button_pressed(self, event):
+        event.widget.config(highlightthickness=1)
+
+        if event.widget == self.btn_0_sec:
+            self.btn_3_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_5_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_10_sec.config(relief=tk.RAISED, highlightthickness=0)
+
+        elif event.widget == self.btn_3_sec:
+            self.btn_0_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_5_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_10_sec.config(relief=tk.RAISED, highlightthickness=0)
+
+        elif event.widget == self.btn_5_sec:
+            self.btn_0_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_3_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_10_sec.config(relief=tk.RAISED, highlightthickness=0)
+            
+        elif event.widget == self.btn_10_sec:
+            self.btn_0_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_3_sec.config(relief=tk.RAISED, highlightthickness=0)
+            self.btn_5_sec.config(relief=tk.RAISED, highlightthickness=0)
+
+        elif event.widget == self.btn_capture:
+            if (self.countdown_value == 0): self.take_picture()
+            else: 
+                self.init_countdown(duration= self.countdown_value, callback= self.take_picture)
+                self.start_countdown()
+             
+    def take_picture(self):
+        self.image_processor.take_picture(self.canvas_capture, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
+
+    def update_preview(self):
+        self.image_processor.update_preview(self.canvas_preview, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
+
+    def process_img(self):
+        self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image)
 
     def generate_gcode(self): # convert SVG file to Gcode
         # Check if the svg file exists
