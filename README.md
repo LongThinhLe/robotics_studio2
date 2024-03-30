@@ -56,13 +56,18 @@ Users can immerse themselves in a unique experience by sitting in front of a 108
   `$ cd ~/rs2_ws/robotics_studio2/src/selfie_drawing_ur3/scripts`
 
 
+6. Make the file to be executable
 
-6. RUN the file GUI.py
+   `$ chmod -x GUI.py`
+
+
+
+8. RUN the file GUI.py
 
   `$ python3 GUI.py`
 
 
 
-7. If you don't have `python3` in your Linux, use:
+8. If you don't have `python3` in your Linux, use:
 
   `$ pip install python3`
