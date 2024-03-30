@@ -1,18 +1,14 @@
+#!/usr/bin/env python3
+
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk
 from tkinter.ttk import *
 
-import cv2
 from PIL import Image, ImageTk
 import os
-import numpy as np
-import svgwrite
-import io
-import cairosvg
 from rembg import remove
 from PIL import Image
 import svgpathtools as svg
-from pygcode import GCode
 
 from image_processing import ImageProcessor
 

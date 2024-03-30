@@ -161,6 +161,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   scripts/move_ur3.py
   scripts/GUI.py
+  scripts/image_processing.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
