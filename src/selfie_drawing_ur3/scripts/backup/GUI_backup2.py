@@ -14,8 +14,6 @@ from PIL import Image
 import svgpathtools as svg
 from pygcode import GCode
 
-from image_processing import ImageProcessor
-
 class SelfieDrawingApp:
 
     # Define global variables for screen width and height in ratio 4:3
@@ -43,15 +41,12 @@ class SelfieDrawingApp:
         self.notebook.add(self.tab_take_picture, text="Take Photo & Processing")
         self.notebook.add(self.tab_robot_draw, text="Robot Draw")
 
-        # Initialize Image Processor
-        self.image_processor = ImageProcessor()
 
         # Initialize components for the "Take Picture" tab
         self.init_take_picture_tab()
- 
+
         # Initialize Icon for application
         self.init_icon()
-
 
 
     #-------------------- Init Icon App
@@ -84,12 +79,12 @@ class SelfieDrawingApp:
             except tk.TclError as e:
                 print("Error setting icon:", e)
 
+
     #-------------------- Init 1st tab
     def init_take_picture_tab(self):
         # Define the desired height for the PREVIEW screens
         screen_width = self.SCREEN_WIDTH
         screen_height = self.SCREEN_HEIGHT
-
 
         #--------------------------------LIVE CAMERA
         # Create a frame to hold the preview screen and its label
@@ -104,7 +99,6 @@ class SelfieDrawingApp:
         self.canvas_preview = tk.Canvas(preview_frame, width=screen_width, height=screen_height)
         self.canvas_preview.pack()
 
-
         #--------------------------------CAPTURE SCREEN
         # Create a frame to hold the capture screen and its label
         capture_frame = tk.Frame(self.tab_take_picture, bd=2, relief=tk.SOLID)
@@ -118,7 +112,6 @@ class SelfieDrawingApp:
         self.canvas_capture = tk.Canvas(capture_frame, width=screen_width, height=screen_height)
         self.canvas_capture.pack()
 
-
         #--------------------------------REMOVE BACKGROUND DISPLAY
         # Create a frame for "Removed Background Image" on the left
         removed_bg_frame = tk.Frame(self.tab_take_picture, bd=2, relief=tk.SOLID)
@@ -131,7 +124,6 @@ class SelfieDrawingApp:
         # Create a canvas for displaying the processed image
         self.canvas_processed_image = tk.Canvas(removed_bg_frame, width=screen_width, height=screen_height)
         self.canvas_processed_image.pack()
-        
         
         #---------------------------------SVG OUTLINE DISPLAY
         # Create a frame for "Traced Outline Image" on the right
@@ -148,30 +140,113 @@ class SelfieDrawingApp:
 
         # Initialize traced outline image variable
         self.traced_outline_image = None
-
-
-        #----------------------------------BUTTONS
+        #-----------------------------------------------------------------------
         # Create a frame to hold the buttons
         button_frame = tk.Frame(self.tab_take_picture)
         button_frame.grid(row=0, column=2, padx=10, pady=10, sticky='ns')  # Adjust row and column as needed
 
         # Create the buttons for taking a picture and resetting
-        btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)  # Set width to fill available horizontal space
-        btn_process_img = tk.Button(button_frame, text="Process Image", command=lambda: self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image), width=15, height= 5)
+        btn_capture = tk.Button(button_frame, text="Take Picture", command=self.take_picture, width=15, height= 5)  # Set width to fill available horizontal space
+        btn_process_img = tk.Button(button_frame, text="Process Image", command=self.process_img, width=15, height= 5)
         btn__generate_gcode = tk.Button(button_frame, text="Generate Gcode", command=self.generate_gcode, width=15, height= 5)
 
         btn_capture.grid(row=0, column=0, padx=10, pady=10, sticky='ew')  #
         btn_process_img.grid(row=1, column=0, padx=10, pady=10, sticky='ew')  #
         btn__generate_gcode.grid(row=2, column=0, padx=10, pady=10, sticky='ew')  #
 
-
         # Initialize captured photo variable
         self.photo = None
 
-        # # Start the webcam preview
-        self.image_processor.update_preview(self.canvas_preview, screen_width, screen_height)
+        # Start the webcam preview
+        self.start_preview()
+
+    #-------------------- Webcam Function
+    def start_preview(self):
+        # Iterate through device indexes until a valid one is found
+        for i in range(10):  # Try up to 10 devices
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                self.cap = cap
+                print(f"Using webcam device: {i}")
+                break
+
+        if self.cap is None:
+            print("No webcam device found.")
+            return
+
+        # Display the live feed in the preview canvas
+        self.update_preview()
+        
+    def update_preview(self):
+        # Capture a frame
+        ret, frame = self.cap.read()
+
+        # Define the desired height for the PREVIEW screens
+        screen_width = self.SCREEN_WIDTH
+        screen_height = self.SCREEN_HEIGHT
+
+        if ret:
+
+            # Convert the frame from BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Resize the frame to fit the preview canvas
+            screen_height = self.canvas_preview.winfo_height()
+            frame_resized = cv2.resize(frame_rgb, (screen_width, screen_height))
+
+            # Convert the frame to ImageTk format
+            photo = ImageTk.PhotoImage(image=Image.fromarray(frame_resized))
+
+            # Update the preview canvas with the new frame
+            self.canvas_preview.create_image(0, 0, anchor=tk.NW, image=photo)
+            self.canvas_preview.image = photo
+
+        # Schedule the next update
+        self.canvas_preview.after(10, self.update_preview)
+
 
     #-------------------- Button Event Function
+    def take_picture(self):
+        # Capture a frame
+        ret, frame = self.cap.read()
+
+        # Define the desired height for the PREVIEW screens
+        screen_width = self.SCREEN_WIDTH
+        screen_height = self.SCREEN_HEIGHT
+
+        if ret:
+            # Convert the frame from BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Resize the frame to fit the capture canvas
+            screen_height = self.canvas_capture.winfo_height()
+            frame_resized = cv2.resize(frame_rgb, (screen_width, screen_height))
+
+            # Convert the frame to ImageTk format
+            self.photo = ImageTk.PhotoImage(image=Image.fromarray(frame_resized))
+
+            # Update the capture canvas with the captured picture
+            self.canvas_capture.create_image(0, 0, anchor=tk.NW, image=self.photo)
+            self.canvas_capture.image = self.photo
+
+            # Determine the save folder path
+            save_folder = os.path.join(self.home_directory, "rs2_ws", "img")
+
+            # Ensure the save folder exists, create it if it doesn't
+            if not os.path.exists(save_folder):
+                os.makedirs(save_folder)
+
+            # Save the captured picture to the specified folder
+            
+            file_path = os.path.join(save_folder, "captured_picture.png")
+            cv2.imwrite(file_path, cv2.cvtColor(frame_resized, cv2.COLOR_RGB2BGR))
+            print("\nPicture saved:", file_path)
+
+    def process_img(self):
+        # Process image after taking picture
+        print("\nProcessing Image, please wait...")
+        self.remove_background_image()
+        self.trace_outline()
 
     def generate_gcode(self): # convert SVG file to Gcode
         # Check if the svg file exists
@@ -249,7 +324,7 @@ class SelfieDrawingApp:
     
     #-------------------- Remove Background and Display Function
 
-    # def remove_background_image(self):
+    def remove_background_image(self):
         # Check if the captured image exists
         file_path = os.path.join(self.home_directory, "rs2_ws", "img", "captured_picture.png")
         if not os.path.exists(file_path):
@@ -272,7 +347,7 @@ class SelfieDrawingApp:
         self.display_processed_image(output_image)
         print("\nRemoved background image:", store_path)
 
-    # def display_processed_image(self, image):
+    def display_processed_image(self, image):
         # Clear the canvas
         self.canvas_processed_image.delete("all")
 
@@ -282,6 +357,74 @@ class SelfieDrawingApp:
         # Update the canvas with the processed image
         self.canvas_processed_image.create_image(0, 0, anchor=tk.NW, image=photo)
         self.canvas_processed_image.image = photo
+
+
+    #-------------------- Trace Outline and Display Function
+    def trace_outline(self):
+        # Check if the captured image exists
+        file_path = os.path.join(self.home_directory, "rs2_ws", "img", "captured_picture_rmbg.png")
+        if not os.path.exists(file_path):
+            print("Image not found.")
+            return
+
+        output_svg_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
+
+        # Read the image
+        image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+
+        # Apply Canny edge detection
+        edges = cv2.Canny(image, 100, 200)
+
+        # Find contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Create SVG object
+        svg = svgwrite.Drawing(output_svg_path, profile='tiny')
+
+        # Iterate through contours
+        for contour in contours:
+            # Approximate contour to reduce points
+            epsilon = 0.01 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+
+            # Convert contour points to SVG format
+            points = [(int(point[0][0]), int(point[0][1])) for point in approx]
+            svg.add(svg.polyline(points, stroke="black", fill="none"))
+
+        # Set the size of the SVG drawing
+        svg['width'] = '640px'  # Set the width of the SVG
+        svg['height'] = '480px'  # Set the height of the SVG
+
+        # Save SVG file
+        svg.save()
+
+        # Display the processed image
+        self.display_trace_outline(svg)
+        print("\nSVG image saved:", output_svg_path)
+
+    def svg_to_png(self,svg_data): # for display purpose
+        png_data = cairosvg.svg2png(bytestring=svg_data)
+        return io.BytesIO(png_data)
+
+    def display_trace_outline(self,svg):
+        file_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
+        with open(file_path, "rb") as f:
+            svg_data = f.read()
+        
+        png_data = self.svg_to_png(svg_data)
+
+        # Open the PNG image with PIL
+        svg_image = Image.open(png_data)
+
+        # Convert the PIL Image to a PhotoImage
+        photo = ImageTk.PhotoImage(svg_image)
+
+        # Display the image on the canvas
+        self.canvas_traced_outline_image.create_image(0, 0, anchor=tk.NW, image=photo)
+        self.canvas_traced_outline_image.image = photo
+
+
+
 
 
 
