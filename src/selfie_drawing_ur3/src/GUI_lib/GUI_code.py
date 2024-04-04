@@ -47,6 +47,9 @@ class SelfieDrawingApp:
 
         # Initialize components for the "Take Picture" tab
         self.init_take_picture_tab()
+
+        # Initialize components for the "Robot Draw" tab
+        self.init_robot_draw_tab()
  
         # Initialize Icon for application
         self.init_icon()
@@ -210,7 +213,53 @@ class SelfieDrawingApp:
         self.update_preview()
 
 
+    #-------------------- Init 2nd tab
+    def init_robot_draw_tab(self):
+        # Create a frame for "Robot Status"
+        robot_status_frame = tk.Frame(self.tab_robot_draw, bd=2, relief=tk.SOLID)
+        robot_status_frame.grid(row=0, column=0, padx=20, pady=10, ipadx=5, ipady=5)
 
+        # Create a label for "Robot Status"
+        lbl_robot_status = tk.Label(robot_status_frame, text="Robot Status", font=("Arial", 20))
+        lbl_robot_status.pack()
+
+        # Create a label to indicate the status
+        self.robot_status_label = tk.Label(robot_status_frame, text="Disconnected", font=("Arial", 16), bg="red", fg="white")
+        self.robot_status_label.pack()
+
+        # Create a frame for "End-effector Position"
+        end_effector_frame = tk.Frame(self.tab_robot_draw, bd=2, relief=tk.SOLID)
+        end_effector_frame.grid(row=0, column=1, padx=20, pady=10, ipadx=5, ipady=5)
+
+        # Create a label for "End-effector Position"
+        lbl_end_effector = tk.Label(end_effector_frame, text="UR3 TCP", font=("Arial", 20))
+        lbl_end_effector.pack()
+
+        # Create a frame to stack labels horizontally
+        coordinates_frame = tk.Frame(end_effector_frame)
+        coordinates_frame.pack()
+
+        x = 10
+        y = 5
+        z = 2
+        rx = 10
+        ry = 0
+        rz = 0
+
+        # Create labels to display the coordinates
+        self.lbl_x = tk.Label(coordinates_frame, text="X:{:.2f} mm".format(x), font=("Arial", 16), bg="lightblue")
+        self.lbl_y = tk.Label(coordinates_frame, text="Y:{:.2f} mm".format(y), font=("Arial", 16))
+        self.lbl_z = tk.Label(coordinates_frame, text="Z:{:.2f} mm".format(z), font=("Arial", 16))
+        self.lbl_rx = tk.Label(coordinates_frame, text="Rx:{:.2f} deg".format(rx), font=("Arial", 16))
+        self.lbl_ry = tk.Label(coordinates_frame, text="Ry:{:.2f} deg".format(ry), font=("Arial", 16))
+        self.lbl_rz = tk.Label(coordinates_frame, text="Rz:{:.2f} deg".format(rz), font=("Arial", 16))
+
+        self.lbl_x.pack(side=tk.LEFT, padx=5)
+        self.lbl_y.pack(side=tk.LEFT, padx=5)
+        self.lbl_z.pack(side=tk.LEFT, padx=5)
+        self.lbl_rx.pack(side=tk.LEFT, padx=5)
+        self.lbl_ry.pack(side=tk.LEFT, padx=5)
+        self.lbl_rz.pack(side=tk.LEFT, padx=5)
         
     #-------------------- Threading for Timer
 
@@ -359,3 +408,10 @@ class SelfieDrawingApp:
     
 
 
+def main():
+    root = tk.Tk()
+    SelfieDrawingApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
