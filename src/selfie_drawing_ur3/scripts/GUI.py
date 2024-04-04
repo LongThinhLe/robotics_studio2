@@ -10,7 +10,7 @@ from rembg import remove
 from PIL import Image
 import svgpathtools as svg
 
-from image_processing import ImageProcessor
+from selfie_drawing.image_processing import ImageProcessor
 
 import threading
 import time
@@ -21,7 +21,7 @@ class SelfieDrawingApp:
     SCREEN_WIDTH = 320
     SCREEN_HEIGHT = 240
 
-    def __init__(self, master):
+    def __init__(self, master: tk.Tk):
         self.master = master
         master.title("Automated Artistic Portraiture")
         master.resizable(False, False)
@@ -390,8 +390,6 @@ class SelfieDrawingApp:
         # Update the canvas with the processed image
         self.canvas_processed_image.create_image(0, 0, anchor=tk.NW, image=photo)
         self.canvas_processed_image.image = photo
-
-
 
 def main():
     root = tk.Tk()
