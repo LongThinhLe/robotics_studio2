@@ -2,7 +2,7 @@ from setuptools import setup
 from catkin_pkg.python_setup import generate_distutils_setup
 
 d = generate_distutils_setup(
-    packages=["selfie_drawing", "ur3_control"],
+    packages=["image_processor", "ur3_control", "GUI_lib"],
     package_dir={"": "src"}
 )
 

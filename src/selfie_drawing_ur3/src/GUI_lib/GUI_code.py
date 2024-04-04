@@ -10,7 +10,7 @@ from rembg import remove
 from PIL import Image
 import svgpathtools as svg
 
-from selfie_drawing.image_processing import ImageProcessor
+from image_processor.image_processing import ImageProcessor
 
 import threading
 import time
@@ -210,6 +210,8 @@ class SelfieDrawingApp:
         self.update_preview()
 
 
+
+        
     #-------------------- Threading for Timer
 
     def init_countdown(self, duration, callback):
@@ -355,46 +357,5 @@ class SelfieDrawingApp:
         center_y = (min_y + max_y) / 2
         return center_x, center_y
     
-    #-------------------- Remove Background and Display Function
 
-    # def remove_background_image(self):
-        # Check if the captured image exists
-        file_path = os.path.join(self.home_directory, "rs2_ws", "img", "captured_picture.png")
-        if not os.path.exists(file_path):
-            print("Captured image not found.")
-            return
 
-        # Store path
-        store_path = os.path.join(self.home_directory, "rs2_ws", "img", "captured_picture_rmbg.png")
-
-        # Processing the image 
-        input_image = Image.open(file_path)
-
-        # Removing the background from the given Image 
-        output_image = remove(input_image)  
-
-        # Removing the background from the given Image 
-        output_image.save(store_path)
-
-        # Display the processed image
-        self.display_processed_image(output_image)
-        print("\nRemoved background image:", store_path)
-
-    # def display_processed_image(self, image):
-        # Clear the canvas
-        self.canvas_processed_image.delete("all")
-
-        # Convert the image to ImageTk format
-        photo = ImageTk.PhotoImage(image=image)
-
-        # Update the canvas with the processed image
-        self.canvas_processed_image.create_image(0, 0, anchor=tk.NW, image=photo)
-        self.canvas_processed_image.image = photo
-
-def main():
-    root = tk.Tk()
-    app = SelfieDrawingApp(root)
-    root.mainloop()
-
-if __name__ == "__main__":
-    main()
