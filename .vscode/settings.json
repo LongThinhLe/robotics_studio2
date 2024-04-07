@@ -1,3 +1,16 @@
 {
-    "cmake.sourceDirectory": "/home/lelongthinh/rs2_ws/src/selfie_drawing_ur3"
+    "cmake.sourceDirectory": "/home/lelongthinh/rs2_ws/src/selfie_drawing_ur3",
+    "python.autoComplete.extraPaths": [
+        "/home/lelongthinh/universal_robot_ws/devel/lib/python3/dist-packages",
+        "/home/lelongthinh/rs2_ws/devel/lib/python3/dist-packages",
+        "/home/lelongthinh/catkin_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/lelongthinh/universal_robot_ws/devel/lib/python3/dist-packages",
+        "/home/lelongthinh/rs2_ws/devel/lib/python3/dist-packages",
+        "/home/lelongthinh/catkin_ws/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages",
+        "./src/selfie_drawing_ur3/src"
+    ]
 }

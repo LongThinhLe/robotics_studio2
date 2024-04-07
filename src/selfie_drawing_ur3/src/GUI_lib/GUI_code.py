@@ -11,9 +11,13 @@ from PIL import Image
 import svgpathtools as svg
 
 from image_processor.image_processing import ImageProcessor
+from ur3_control.move_ur3 import UR3_Movement
 
 import threading
 import time
+
+import subprocess
+import rospy
 
 class SelfieDrawingApp:
 
@@ -22,6 +26,7 @@ class SelfieDrawingApp:
     SCREEN_HEIGHT = 240
 
     def __init__(self, master: tk.Tk):
+        self.process = None
         self.master = master
         master.title("Automated Artistic Portraiture")
         master.resizable(False, False)
@@ -41,6 +46,14 @@ class SelfieDrawingApp:
         # Add tabs to the notebook
         self.notebook.add(self.tab_take_picture, text="Take Photo & Processing")
         self.notebook.add(self.tab_robot_draw, text="Robot Draw")
+
+        # X,Y,Z,Rx,Ry,Rz
+        self.x_tcp = 0
+        self.y_tcp = 0
+        self.z_tcp = 0
+        self.rx_tcp = 0
+        self.ry_tcp = 0
+        self.rz_tcp = 0
 
         # Initialize Image Processor
         self.image_processor = ImageProcessor()
@@ -215,52 +228,242 @@ class SelfieDrawingApp:
 
     #-------------------- Init 2nd tab
     def init_robot_draw_tab(self):
+        # Create a frame for the name
+        name_frame = tk.Frame(self.tab_robot_draw)
+        name_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, ipadx=5, ipady=5, sticky="w")
+
+        # Create a label for "Name"
+        lbl_name = tk.Label(name_frame, text="Name", font=("Arial", 20))
+        lbl_name.grid(row=0, column=0, sticky="w")
+
+        # Create a frame to hold the robot name label and the status label
+        status_frame = tk.Frame(name_frame)
+        status_frame.grid(row=0, column=1, sticky="w")
+
+        # Create a label for the robot name
+        robot_name = tk.Label(status_frame, text="UR3 Robot Arm", font=("Arial", 20, "bold"), fg= "blue")
+        robot_name.pack(side=tk.LEFT, padx=(20, 40))  # Adjust padx as needed
+
         # Create a frame for "Robot Status"
-        robot_status_frame = tk.Frame(self.tab_robot_draw, bd=2, relief=tk.SOLID)
-        robot_status_frame.grid(row=0, column=0, padx=20, pady=10, ipadx=5, ipady=5)
+        robot_status_frame = tk.Frame(status_frame)
+        robot_status_frame.pack(side=tk.LEFT)
 
         # Create a label for "Robot Status"
-        lbl_robot_status = tk.Label(robot_status_frame, text="Robot Status", font=("Arial", 20))
-        lbl_robot_status.pack()
+        lbl_robot_status = tk.Label(robot_status_frame, text="Status", font=("Arial", 20))
+        lbl_robot_status.pack(side=tk.LEFT)
 
-        # Create a label to indicate the status
+        # Create a label to indicate the status (UPDATE REAL-TIME)
         self.robot_status_label = tk.Label(robot_status_frame, text="Disconnected", font=("Arial", 16), bg="red", fg="white")
-        self.robot_status_label.pack()
+        self.robot_status_label.pack(side=tk.LEFT, padx=20, ipadx=10)
 
-        # Create a frame for "End-effector Position"
-        end_effector_frame = tk.Frame(self.tab_robot_draw, bd=2, relief=tk.SOLID)
-        end_effector_frame.grid(row=0, column=1, padx=20, pady=10, ipadx=5, ipady=5)
+        # Create a frame for "IP Address"
+        ip_frame = tk.Frame(name_frame)
+        ip_frame.grid(row=1, column=0, columnspan=2, ipadx=5, ipady=10, sticky="ew")
 
-        # Create a label for "End-effector Position"
-        lbl_end_effector = tk.Label(end_effector_frame, text="UR3 TCP", font=("Arial", 20))
-        lbl_end_effector.pack()
+        # Create a label for "IP Address"
+        lbl_ip = tk.Label(ip_frame, text="IP Address", font=("Arial", 20))
+        lbl_ip.pack(side=tk.LEFT)
 
-        # Create a frame to stack labels horizontally
-        coordinates_frame = tk.Frame(end_effector_frame)
+        # Create an entry for IP address input
+        self.ip_entry = tk.Entry(ip_frame, font=("Arial", 16), width=15)
+        self.ip_entry.pack(side=tk.LEFT, padx=10)
+
+        # Create a button to connect
+        connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
+        connect_button.pack(side=tk.LEFT)
+
+        # Create a button to disconnect
+        disconnect_button = tk.Button(ip_frame, text="Disconnect", font=("Arial", 16), command= lambda: self.disconnect_from_robot())
+        disconnect_button.pack(side=tk.LEFT, padx=10)
+
+
+        #-------------------------------------------- TCP display
+
+        # Create a frame for "UR3 TCP" on the right
+        ur3_tcp_frame = tk.Frame(self.tab_robot_draw, bd=2, relief=tk.SOLID)
+        ur3_tcp_frame.grid(row=0, column=2, rowspan=2, padx=10, pady=10, ipadx=5, ipady=5, sticky="w")
+
+        # Create a label for "UR3 TCP"
+        lbl_ur3_tcp = tk.Label(ur3_tcp_frame, text="UR3 TCP", font=("Arial", 20))
+        lbl_ur3_tcp.pack()
+
+        # Create a frame to stack labels vertically for coordinates
+        coordinates_frame = tk.Frame(ur3_tcp_frame)
         coordinates_frame.pack()
 
-        x = 10
-        y = 5
-        z = 2
-        rx = 10
-        ry = 0
-        rz = 0
-
         # Create labels to display the coordinates
-        self.lbl_x = tk.Label(coordinates_frame, text="X:{:.2f} mm".format(x), font=("Arial", 16), bg="lightblue")
-        self.lbl_y = tk.Label(coordinates_frame, text="Y:{:.2f} mm".format(y), font=("Arial", 16))
-        self.lbl_z = tk.Label(coordinates_frame, text="Z:{:.2f} mm".format(z), font=("Arial", 16))
-        self.lbl_rx = tk.Label(coordinates_frame, text="Rx:{:.2f} deg".format(rx), font=("Arial", 16))
-        self.lbl_ry = tk.Label(coordinates_frame, text="Ry:{:.2f} deg".format(ry), font=("Arial", 16))
-        self.lbl_rz = tk.Label(coordinates_frame, text="Rz:{:.2f} deg".format(rz), font=("Arial", 16))
+        lbl_x = tk.Label(coordinates_frame, text="X:{:.2f} mm".format(self.x_tcp), font=("Arial", 16))
+        lbl_y = tk.Label(coordinates_frame, text="Y:{:.2f} mm".format(self.y_tcp), font=("Arial", 16))
+        lbl_z = tk.Label(coordinates_frame, text="Z:{:.2f} mm".format(self.z_tcp), font=("Arial", 16))
+        lbl_rx = tk.Label(coordinates_frame, text="Rx:{:.2f} deg".format(self.rx_tcp), font=("Arial", 16))
+        lbl_ry = tk.Label(coordinates_frame, text="Ry:{:.2f} deg".format(self.ry_tcp), font=("Arial", 16))
+        lbl_rz = tk.Label(coordinates_frame, text="Rz:{:.2f} deg".format(self.rz_tcp), font=("Arial", 16))
 
-        self.lbl_x.pack(side=tk.LEFT, padx=5)
-        self.lbl_y.pack(side=tk.LEFT, padx=5)
-        self.lbl_z.pack(side=tk.LEFT, padx=5)
-        self.lbl_rx.pack(side=tk.LEFT, padx=5)
-        self.lbl_ry.pack(side=tk.LEFT, padx=5)
-        self.lbl_rz.pack(side=tk.LEFT, padx=5)
+        lbl_x.grid(row=0, column=0, padx=5)
+        lbl_y.grid(row=1, column=0, padx=5)
+        lbl_z.grid(row=2, column=0, padx=5)
+        lbl_rx.grid(row=0, column=1, padx=5)
+        lbl_ry.grid(row=1, column=1, padx=5)
+        lbl_rz.grid(row=2, column=1, padx=5)
+
+
+        #------------------------------------------- Terminate button
+        terminate_frame = tk.Frame(self.tab_robot_draw)
+        terminate_frame.grid(row=1, column=0, columnspan=1, sticky="w", pady= 10)
+        terminate_button = tk.Button(terminate_frame,text="Terminate All", font=("Arial", 16), command= lambda: self.terminate_process(), width=52)
+        terminate_button.pack(side=tk.LEFT, padx=10)
+
+        #------------------------------------------- Launch Simulation and Initialize Robot
+        # Create a frame for the buttons
+        buttons_frame = tk.Frame(self.tab_robot_draw)
+        buttons_frame.grid(row=2, column=0, columnspan=1, sticky="w")
+
+        # Create a button to launch UR3 Gazebo
+        launch_gazebo_button = tk.Button(buttons_frame, text="Launch Gazebo", font=("Arial", 16), command= lambda: self.launch_gazebo())
+        launch_gazebo_button.pack(side=tk.LEFT, padx=10)
+
+        # Create a button to launch MoveIt Planning
+        launch_moveit_planning_button = tk.Button(buttons_frame, text="Launch MoveIt Planning", font=("Arial", 16), command= lambda: self.launch_moveit_planning())
+        launch_moveit_planning_button.pack(side=tk.LEFT, padx=10)
+
+        # Create a button to launch MoveIt
+        launch_moveit_button = tk.Button(buttons_frame, text="Launch MoveIt", font=("Arial", 16), command= lambda: self.launch_moveit())
+        launch_moveit_button.pack(side=tk.LEFT, padx=10)
+
+
+        # Create a frame for Robot initialize
+        initRobot_buttons_frame = tk.Frame(self.tab_robot_draw)
+        initRobot_buttons_frame.grid(row=3, column=0, columnspan=1, sticky="w", pady= 10)
+
+        # Create a button for "Init"
+        initRobot_button = tk.Button(initRobot_buttons_frame, text="Initialize Robot UR3", font=("Arial", 16), width= 52, command= lambda: self.init_robot_ur3())
+        initRobot_button.pack(side=tk.LEFT, padx=10)
         
+
+        #--------------------------------------------- Homing
+        # Create a frame for Robot Homing
+        homing_button_frame = tk.Frame(self.tab_robot_draw)
+        homing_button_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
+
+        # Create a button for "Init"
+        homing_button = tk.Button(homing_button_frame, text="Homing", font=("Arial", 16), width= 52, command= lambda: self.homing_ur3())
+        homing_button.pack(side=tk.LEFT, padx=10)
+
+
+        #--------------------------------------------- Draw Buttons
+        # Create a frame for drawing buttons
+        additional_buttons_frame = tk.Frame(self.tab_robot_draw)
+        additional_buttons_frame.grid(row=5, column=0, columnspan=1, sticky="w")
+
+        # Create a button for "Draw!"
+        draw_button = tk.Button(additional_buttons_frame, text="Draw!", font=("Arial", 16))
+        draw_button.pack(side=tk.LEFT, padx=10)
+
+        # Create a button for "Pause"
+        pause_button = tk.Button(additional_buttons_frame, text="Pause", font=("Arial", 16))
+        pause_button.pack(side=tk.LEFT, padx=10)
+
+        # Create a button for "Stop"
+        stop_button = tk.Button(additional_buttons_frame, text="Stop", font=("Arial", 16))
+        stop_button.pack(side=tk.LEFT, padx=10)
+
+        # Create a button for "Run Test"
+        run_test_button = tk.Button(additional_buttons_frame, text="Run Test", font=("Arial", 16))
+        run_test_button.pack(side=tk.LEFT, padx=10)
+
+
+
+
+
+    #-------------------- GET IP ADDRESS FROM INPUT TO CONNECT ROBOT
+    def connect_to_robot(self):
+        # Get the IP address from the entry widget
+        robot_ip = self.ip_entry.get()
+
+        # Construct the command to execute
+        command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
+
+        # Execute the command
+        self.process = subprocess.Popen(command)
+
+
+    def disconnect_from_robot(self):
+        # # Terminate the process if it exists
+        # if hasattr(self, 'process') and self.process:
+        #     self.process.terminate()
+        pass
+
+    def terminate_process(self):
+        # Terminate the process if it exists
+        if self.process:
+            self.process.terminate()
+            self.process.wait()  # Wait for the process to terminate completely
+            self.process = None
+
+        # Initialize ROS if it hasn't been initialized yet
+        if not rospy.core.is_initialized():
+            rospy.init_node('process_terminator_node', anonymous=True)
+
+        # Use subprocess to execute rosnode list command
+        process = subprocess.Popen(['rosnode', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, error = process.communicate()
+
+        # Check if there was any error
+        if process.returncode != 0:
+            print("Error executing rosnode list command:", error.decode())
+            return
+
+        # Split the output into individual node names
+        node_names = output.decode().split()
+
+        # Print the list of node names for debugging
+        print("List of ROS nodes:", node_names)
+
+        # Iterate through the node names and kill each node
+        for node_name in node_names:
+            node_process = subprocess.Popen(['rosnode', 'kill', node_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            _, node_error = node_process.communicate()
+            if node_process.returncode != 0:
+                print(f"Error killing node {node_name}: {node_error.decode()}")
+
+        # Kill Gazebo processes
+        gazebo_process = subprocess.run(['pkill', '-f', 'gazebo'])
+        if gazebo_process.returncode != 0:
+            print("Error killing Gazebo processes")
+
+        # Kill all remaining ROS nodes
+        all_nodes_process = subprocess.run(['rosnode', 'kill', '-a'])
+        if all_nodes_process.returncode != 0:
+            print("Error killing all ROS nodes")
+
+
+
+    def launch_gazebo(self):
+        # Construct the command to execute
+        command = ['roslaunch', 'ur_gazebo', 'ur3_bringup.launch']
+        # Execute the command
+        self.process = subprocess.Popen(command) 
+    
+    def launch_moveit_planning(self):
+        # Construct the command to execute
+        command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
+        # Execute the command
+        self.process = subprocess.Popen(command) 
+
+    def launch_moveit(self):
+        # Construct the command to execute
+        command = ["roslaunch", "ur3_moveit_config", "moveit_rviz.launch"]
+        # Execute the command
+        self.process = subprocess.Popen(command) 
+
+    def init_robot_ur3(self):
+        # Initialize UR3
+        self.ur3_operate = UR3_Movement()
+
+    def homing_ur3(self):
+        # Homing robot with specific joint state
+        self.ur3_operate.init_joint_state()
+
     #-------------------- Threading for Timer
 
     def init_countdown(self, duration, callback):
