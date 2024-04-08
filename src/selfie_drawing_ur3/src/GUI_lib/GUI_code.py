@@ -356,7 +356,7 @@ class SelfieDrawingApp:
         additional_buttons_frame.grid(row=5, column=0, columnspan=1, sticky="w")
 
         # Create a button for "Draw!"
-        draw_button = tk.Button(additional_buttons_frame, text="Draw!", font=("Arial", 16))
+        draw_button = tk.Button(additional_buttons_frame, text="Draw!", font=("Arial", 16), command= lambda: self.start_drawing())
         draw_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Pause"
@@ -371,11 +371,15 @@ class SelfieDrawingApp:
         run_test_button = tk.Button(additional_buttons_frame, text="Run Test", font=("Arial", 16))
         run_test_button.pack(side=tk.LEFT, padx=10)
 
+        # Create a button for "Print Pose"
+        print_pose_button = tk.Button(additional_buttons_frame, text="Print Pose", font=("Arial", 16), command= lambda: self.print_ur3_pose())
+        print_pose_button.pack(side=tk.LEFT, padx=10)
 
 
 
 
-    #-------------------- GET IP ADDRESS FROM INPUT TO CONNECT ROBOT
+
+    #-------------------- Buttons for Robot
     def connect_to_robot(self):
         # Get the IP address from the entry widget
         robot_ip = self.ip_entry.get()
@@ -436,8 +440,6 @@ class SelfieDrawingApp:
         if all_nodes_process.returncode != 0:
             print("Error killing all ROS nodes")
 
-
-
     def launch_gazebo(self):
         # Construct the command to execute
         command = ['roslaunch', 'ur_gazebo', 'ur3_bringup.launch']
@@ -463,6 +465,24 @@ class SelfieDrawingApp:
     def homing_ur3(self):
         # Homing robot with specific joint state
         self.ur3_operate.init_joint_state()
+
+    
+    def start_drawing(self):
+        # self.ur3_operate.gcode_to_pose_goal()
+        cartesian_plan, fraction = self.ur3_operate.plan_cartesian_path()
+        self.ur3_operate.execute_plan(cartesian_plan)
+
+    def print_ur3_pose(self):
+        print("\nCurrent pose:", self.ur3_operate.move_group.get_current_pose().pose)
+
+
+
+
+
+
+
+
+
 
     #-------------------- Threading for Timer
 
@@ -496,7 +516,7 @@ class SelfieDrawingApp:
         self.countdown_value = seconds
 
 
-    #-------------------- Button Event Function
+    #-------------------- Buttons for Image Processing
     def button_pressed(self, event):
         event.widget.config(highlightthickness=1)
 

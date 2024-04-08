@@ -2,6 +2,7 @@
 
 import sys
 import rospy
+import copy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
@@ -65,6 +66,7 @@ class UR3_Movement(object):
         print("============ Printing robot state")
         print(robot.get_current_state())
         print("")
+
 
         # Misc variables
         self.box_name = ''
@@ -200,15 +202,49 @@ class UR3_Movement(object):
       plan = move_group.go(wait=True)
       move_group.stop()
       move_group.clear_pose_targets()
+      print("\nPose Information:", self.move_group.get_current_pose().pose)
 
 
+  def plan_cartesian_path(self,scale = 1):
+    move_group = self.move_group
+    waypoints = []
+
+    wpose = move_group.get_current_pose().pose
+    wpose.position.z += scale * 0.1  # First move up (z)
+    wpose.position.y += scale * 0.2  # and sideways (y)
+    waypoints.append(copy.deepcopy(wpose))
+
+    wpose.position.x += scale * 0.1  # Second move forward/backwards in (x)
+    waypoints.append(copy.deepcopy(wpose))
+
+    wpose.position.y -= scale * 0.2  # Third move sideways (y)
+    waypoints.append(copy.deepcopy(wpose))
+
+    #------ mirror
+
+    wpose.position.y += scale * 0.2  # Third move sideways (y)
+    waypoints.append(copy.deepcopy(wpose))
+
+    wpose.position.x -= scale * 0.1  # Second move forward/backwards in (x)
+    waypoints.append(copy.deepcopy(wpose))
+
+    wpose.position.y -= scale * 0.2  # and sideways (y)
+    wpose.position.z -= scale * 0.1  # First move up (z)
+    
+    waypoints.append(copy.deepcopy(wpose))
 
 
+    (plan, fraction) = move_group.compute_cartesian_path(
+                                          waypoints,   # waypoints to follow
+                                          0.01,        # eef_step
+                                          0.0)         # jump_threshold
+
+    return plan, fraction
 
 
-
-
-
+  def execute_plan(self,plan):
+    move_group = self.move_group
+    move_group.execute(plan, wait=True)
 
 
 # def main():
