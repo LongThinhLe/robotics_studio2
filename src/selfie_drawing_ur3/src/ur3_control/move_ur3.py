@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 
 import sys
-import copy
 import rospy
+import copy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
 import math
 from math import pi
-from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
 import numpy as np
-import roboticstoolbox as rtb
 
 def all_close(goal, actual, tolerance):
   """
@@ -36,68 +34,45 @@ def all_close(goal, actual, tolerance):
   return True
 
 
-class MoveGroupPythonIntefaceTutorial(object):
-  """MoveGroupPythonIntefaceTutorial"""
+class UR3_Movement(object):
+
   def __init__(self):
-    super(MoveGroupPythonIntefaceTutorial, self).__init__() # super: allows to call the superclass within a subclass => for initializing attributes that is common to both superclass and subclass.
+    try:
+        # First, initialize rospy node
+        rospy.init_node('selfie_drawing_ur3_movement', anonymous=True)
 
-    ##
-    ## First initialize `moveit_commander`_ and a `rospy`_ node:
-    moveit_commander.roscpp_initialize(sys.argv)  # initialize the Python MoveIt commander library. roscpp_...: ROS C++ API communication with the ROS master node. It takes 'sys.argv' as an argument, a list containing the command line arguments passed to the Python script
-    rospy.init_node('selfie_drawing_ur3_movement', anonymous=True) # name of the ROS node => should reflects its purpose. Anonymous = ensures each instance of the script gets the unique name by appending random numbers to the provided node name => useful when running multiple intances of the same script to avoid naming conflicts.
+        # Then initialize MoveIt components
+        moveit_commander.roscpp_initialize(sys.argv)
 
-    ## Instantiate a `RobotCommander`_ object. Provides information such as the robot's
-    ## kinematic model and the robot's current joint states
-    robot = moveit_commander.RobotCommander()
+        # Instantiate MoveIt objects
+        robot = moveit_commander.RobotCommander()
+        scene = moveit_commander.PlanningSceneInterface()
+        move_group = moveit_commander.MoveGroupCommander("manipulator")
+        display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path', moveit_msgs.msg.DisplayTrajectory, queue_size=20)
 
-    ## Instantiate a `PlanningSceneInterface`_ object.  This provides a remote interface
-    ## for getting, setting, and updating the robot's internal understanding of the
-    ## surrounding world:
-    scene = moveit_commander.PlanningSceneInterface()
+        # Store objects as attributes
+        self.robot = robot
+        self.scene = scene
+        self.move_group = move_group
+        self.display_trajectory_publisher = display_trajectory_publisher
 
-    ## Instantiate a `MoveGroupCommander`_ object.  This object is an interface
-    ## to a planning group (group of joints). To control robot arm, the group name should be 'manipulator'.
-    ## This interface can be used to plan and execute motions:
-    group_name = "manipulator"
-    move_group = moveit_commander.MoveGroupCommander(group_name)
-
-    ## Create a `DisplayTrajectory`_ ROS publisher which is used to display
-    ## trajectories in Rviz:
-    display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-                                                   moveit_msgs.msg.DisplayTrajectory,
-                                                   queue_size=20)
-
-
-    ##
-    ## Getting Basic Information
-    ## ^^^^^^^^^^^^^^^^^^^^^^^^^
-    # We can get the name of the reference frame for this robot:
-    planning_frame = move_group.get_planning_frame()
-    print("============ Planning frame: %s" % planning_frame)
-
-    # We can also print the name of the end-effector link for this group:
-    eef_link = move_group.get_end_effector_link()
-    print("============ End effector link: %s" % eef_link)
-
-    # We can get a list of all the groups in the robot:
-    group_names = robot.get_group_names()
-    print("============ Available Planning Groups:", robot.get_group_names())
-
-    # Sometimes for debugging it is useful to print the entire state of the robot:
-    print("============ Printing robot state")
-    print(robot.get_current_state())
-    print("")
+        # Print information for debugging
+        planning_frame = move_group.get_planning_frame()
+        eef_link = move_group.get_end_effector_link()
+        group_names = robot.get_group_names()
+        print("============ Planning frame:", planning_frame)
+        print("============ End effector link:", eef_link)
+        print("============ Available Planning Groups:", group_names)
+        print("============ Printing robot state")
+        print(robot.get_current_state())
+        print("")
 
 
-    # Misc variables
-    self.box_name = ''
-    self.robot = robot
-    self.scene = scene
-    self.move_group = move_group
-    self.display_trajectory_publisher = display_trajectory_publisher
-    self.planning_frame = planning_frame
-    self.eef_link = eef_link
-    self.group_names = group_names
+        # Misc variables
+        self.box_name = ''
+
+    except rospy.ROSException as e:
+        print("Error initializing UR3_Movement:", str(e))
 
 
   def init_joint_state(self):
@@ -227,46 +202,80 @@ class MoveGroupPythonIntefaceTutorial(object):
       plan = move_group.go(wait=True)
       move_group.stop()
       move_group.clear_pose_targets()
+      print("\nPose Information:", self.move_group.get_current_pose().pose)
 
 
+  def plan_cartesian_path(self,scale = 1):
+    move_group = self.move_group
+    waypoints = []
 
+    wpose = move_group.get_current_pose().pose
+    wpose.position.z += scale * 0.1  # First move up (z)
+    wpose.position.y += scale * 0.2  # and sideways (y)
+    waypoints.append(copy.deepcopy(wpose))
 
+    wpose.position.x += scale * 0.1  # Second move forward/backwards in (x)
+    waypoints.append(copy.deepcopy(wpose))
 
+    wpose.position.y -= scale * 0.2  # Third move sideways (y)
+    waypoints.append(copy.deepcopy(wpose))
 
+    #------ mirror
 
+    wpose.position.y += scale * 0.2  # Third move sideways (y)
+    waypoints.append(copy.deepcopy(wpose))
 
+    wpose.position.x -= scale * 0.1  # Second move forward/backwards in (x)
+    waypoints.append(copy.deepcopy(wpose))
 
-
-
-def main():
-  try:
-    print("")
-    print("----------------------------------------------------------")
-    print("MoveIt GCode Control UR3 Robot")
-    print("----------------------------------------------------------")
-    print("Press Ctrl-D to exit at any time")
-    print("")
-    # input()
-    ur3_movement = MoveGroupPythonIntefaceTutorial()
-
-    ur3_movement.init_joint_state()
-
-
-
-    # ur3_movement.init_pose()
+    wpose.position.y -= scale * 0.2  # and sideways (y)
+    wpose.position.z -= scale * 0.1  # First move up (z)
     
-    # ur3_movement.gcode_to_pose_goal()
-    # while (True):
-        # ur3_movement.list_pose_goal()
-        # ur3_movement.gcode_to_pose_goal()
-        # continue
-    print("===== Python tutorial demo complete! =====")
+    waypoints.append(copy.deepcopy(wpose))
 
 
-  except rospy.ROSInterruptException:
-    return
-  except KeyboardInterrupt:
-    return
+    (plan, fraction) = move_group.compute_cartesian_path(
+                                          waypoints,   # waypoints to follow
+                                          0.01,        # eef_step
+                                          0.0)         # jump_threshold
 
-if __name__ == '__main__':
-  main()
+    return plan, fraction
+
+
+  def execute_plan(self,plan):
+    move_group = self.move_group
+    move_group.execute(plan, wait=True)
+
+
+# def main():
+#   try:
+#     print("")
+#     print("----------------------------------------------------------")
+#     print("MoveIt GCode Control UR3 Robot")
+#     print("----------------------------------------------------------")
+#     print("Press Ctrl-D to exit at any time")
+#     print("")
+#     # input()
+#     ur3_movement = UR3_Movement()
+
+#     ur3_movement.init_joint_state()
+
+
+
+#     # ur3_movement.init_pose()
+    
+#     # ur3_movement.gcode_to_pose_goal()
+#     # while (True):
+#         # ur3_movement.list_pose_goal()
+#         # ur3_movement.gcode_to_pose_goal()
+#         # continue
+#     print("===== Python tutorial demo complete! =====")
+
+
+#   except rospy.ROSInterruptException:
+#     return
+#   except KeyboardInterrupt:
+#     return
+
+# if __name__ == '__main__':
+#   main()
