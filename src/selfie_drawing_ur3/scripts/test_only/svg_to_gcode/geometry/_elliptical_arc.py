@@ -56,3 +56,7 @@ class EllipticalArc(Curve):
 
     def sanity_check(self):
         pass
+    
+    def reverse(self):
+        self.start_angle, self.end_angle = self.end_angle, self.start_angle
+        self.start, self.end = self.end, self.start

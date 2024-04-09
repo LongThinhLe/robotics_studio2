@@ -70,3 +70,8 @@ class CircularArc(Curve):
         except AssertionError:
             raise ValueError(f"Center is not equidistant to the start and end points within tolerance, "
                              f"|{abs(self.start - self.center)} - {abs(self.end - self.center)}| >= {TOLERANCES['input']}")
+            
+    
+    def reverse(self):
+        self.start, self.end = self.end, self.start
+        self.start_angle, self.end_angle = self.end_angle, self.start_angle

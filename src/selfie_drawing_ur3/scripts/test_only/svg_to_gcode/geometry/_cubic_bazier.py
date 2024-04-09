@@ -30,3 +30,7 @@ class CubicBazier(Curve):
 
     def sanity_check(self):
         pass
+    
+    def reverse(self):
+        self.start, self.end = self.end, self.start
+        self.control1, self.control2 = self.control2, self.control1

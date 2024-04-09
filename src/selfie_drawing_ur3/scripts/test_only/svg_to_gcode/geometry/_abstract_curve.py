@@ -72,3 +72,9 @@ class Curve:
             maximum_distance = distance if distance > maximum_distance else maximum_distance
 
         return maximum_distance
+    
+    def reverse(self):
+        """
+        Reverse the curve's direction.
+        """
+        raise NotImplementedError("reverse(self) must be implemented")

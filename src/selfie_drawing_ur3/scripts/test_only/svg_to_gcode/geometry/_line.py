@@ -30,3 +30,8 @@ class Line(Curve):
 
     def derivative(self, t):
         return self.slope
+
+    def reverse(self):
+        self.start, self.end = self.end, self.start
+        self.slope = formulas.line_slope(self.start, self.end)
+        self.offset = formulas.line_offset(self.start, self.end)

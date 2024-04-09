@@ -7,10 +7,34 @@ def reorder_curves_greedy(curves):
     ordered_curves.append(current_curve)
     
     while remaining_curves:
-        closest_curve = min(remaining_curves, key=lambda curve: distance(current_curve.end, curve.start))
-        remaining_curves.remove(closest_curve)
-        ordered_curves.append(closest_curve)
-        current_curve = closest_curve
+        # Find the curve that minimizes the distance from the current curve's end
+        best_fit = None
+        best_distance = float('inf')
+        reverse_best_fit = False
+
+        for curve in remaining_curves:
+            # Use attribute access for 'start' and 'end'
+            direct_distance = distance(current_curve.end, curve.start)
+            reversed_distance = distance(current_curve.end, curve.end)
+            
+            if direct_distance < best_distance:
+                best_fit = curve
+                best_distance = direct_distance
+                reverse_best_fit = False
+                
+            if reversed_distance < best_distance:
+                best_fit = curve
+                best_distance = reversed_distance
+                reverse_best_fit = True
+        
+        remaining_curves.remove(best_fit)
+        
+        if reverse_best_fit:
+            # Reverse the curve's direction if necessary
+            best_fit.reverse()
+        
+        ordered_curves.append(best_fit)
+        current_curve = best_fit
     
     return ordered_curves
 
