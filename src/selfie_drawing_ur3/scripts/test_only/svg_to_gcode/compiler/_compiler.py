@@ -24,8 +24,7 @@ class Compiler:
         :param custom_footer: Commands executed after all generated commands. Defaults to lifting the pen.
         """
         self.interface = interface_class()
-        self.dwell_time = dwell_time
-        self.offset_skipped = False
+        self.first_movement = True
 
         if (unit is not None) and (unit not in UNITS):
             raise ValueError(f"Unknown unit {unit}. Please specify one of the following: {UNITS}")
@@ -85,15 +84,20 @@ class Compiler:
 
         # Don't dwell if the new start is at the current position
         if self.interface.position is None or abs(self.interface.position - start) > TOLERANCES["operation"]:
+            
+            # Lift pen and move to starting position of new line chain
+            
+            
             code = [self.interface.pen_up()]
             code.append(self.interface.relative_linear_move(start.x, start.y))
             code.append(self.interface.pen_down())
-
-            if self.dwell_time > 0:
-                code = [self.interface.dwell(self.dwell_time)] + code
                 
         for line in line_chain:
             code.append(self.interface.relative_linear_draw(line.end.x, line.end.y))
+            
+        if self.first_movement:
+            self.first_movement = False
+            del code[1]
 
         self.body.extend(code)
 
