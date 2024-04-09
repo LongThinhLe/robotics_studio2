@@ -1,3 +1,10 @@
+import math
+import copy
+import elkai
+
+def distance(point1, point2):
+    return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
+
 
 def reorder_curves_greedy(curves):
     ordered_curves = []
@@ -38,7 +45,42 @@ def reorder_curves_greedy(curves):
     
     return ordered_curves
 
-import math
+def create_distance_matrix(curves):
+    n = len(curves) * 2  # Double the nodes for reversal options
+    distance_matrix = [[0] * n for _ in range(n)]
+    
+    for i in range(len(curves)):
+        for j in range(len(curves)):
+            if i != j:  
+                # Direct distances
+                distance_matrix[2*i][2*j] = round(distance(curves[i].end, curves[j].start))
+                distance_matrix[2*i+1][2*j+1] = round(distance(curves[i].start, curves[j].end))
 
-def distance(point1, point2):
-    return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
+                # Reversal distances
+                distance_matrix[2*i][2*j+1] = round(distance(curves[i].end, curves[j].end))
+                distance_matrix[2*i+1][2*j] = round(distance(curves[i].start, curves[j].start))
+    
+    return distance_matrix
+
+def apply_tsp_solution_with_reversal(curves, tsp_solution):
+    ordered_and_oriented_curves = []
+    for node in tsp_solution:
+        curve_index = node // 2
+        curve = curves[curve_index]
+        
+        # Check if the curve should be reversed
+        if node % 2 == 1:
+            # If so, make a copy and reverse it 
+            curve = copy.deepcopy(curve)  
+            curve.reverse()
+        
+        ordered_and_oriented_curves.append(curve)
+    
+    return ordered_and_oriented_curves
+
+def solve_tsp(curves):
+    distance_matrix = create_distance_matrix(curves)
+    tour = elkai.solve_int_matrix(distance_matrix)
+    ordered_curves = apply_tsp_solution_with_reversal(curves, tour)
+    
+    return ordered_curves
