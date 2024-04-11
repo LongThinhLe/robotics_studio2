@@ -11,6 +11,10 @@ from math import pi
 from moveit_commander.conversions import pose_to_list
 import numpy as np
 
+import threading 
+import time
+
+
 def all_close(goal, actual, tolerance):
   """
   Convenience method for testing if a list of values are within a tolerance of their counterparts in another list
@@ -67,9 +71,14 @@ class UR3_Movement(object):
         print(robot.get_current_state())
         print("")
 
+        self.target_pose = None
+        self.move_thread = None
+        self.paused_pose = None
 
-        # Misc variables
-        self.box_name = ''
+        self.stop_flag = threading.Event()  # Event to signal stop
+        self.stop_flag.clear()
+        self.pause_flag = threading.Event() 
+        self.pause_flag.clear()
 
     except rospy.ROSException as e:
         print("Error initializing UR3_Movement:", str(e))
@@ -81,16 +90,20 @@ class UR3_Movement(object):
     joint_goal = move_group.get_current_joint_values()
     joint_deg = [20, -100, -125, -26, -280, 20]
     joint_goal = np.deg2rad(joint_deg)
+    print ("Start threading inside init joint state")
 
     move_group.go(joint_goal, wait=True)
+
     move_group.stop()
     
+    # Reset the stop flag after homing
+    self.stop_flag.clear()
+    self.pause_flag.clear()
 
     # For testing:
     current_joints = move_group.get_current_joint_values()
     return all_close(joint_goal, current_joints, 0.01)
   
-
 
   def init_pose(self):
 
@@ -118,7 +131,6 @@ class UR3_Movement(object):
     current_pose = self.move_group.get_current_pose().pose
     return all_close(pose_goal, current_pose, 0.01)
   
-
 
   def list_pose_goal(self):
     move_group = self.move_group
@@ -205,46 +217,110 @@ class UR3_Movement(object):
       print("\nPose Information:", self.move_group.get_current_pose().pose)
 
 
-  def plan_cartesian_path(self,scale = 1):
-    move_group = self.move_group
-    waypoints = []
+#------------------- Start Testing threading
 
-    wpose = move_group.get_current_pose().pose
-    wpose.position.z += scale * 0.1  # First move up (z)
-    wpose.position.y += scale * 0.2  # and sideways (y)
-    waypoints.append(copy.deepcopy(wpose))
+  # def plan_cartesian_path(self,scale = 1):
+  #   move_group = self.move_group
+  #   waypoints = []
 
-    wpose.position.x += scale * 0.1  # Second move forward/backwards in (x)
-    waypoints.append(copy.deepcopy(wpose))
+  #   wpose = move_group.get_current_pose().pose
+  #   wpose.position.z += scale * 0.05  # First move up (z)
+  #   wpose.position.y += scale * 0.1  # and sideways (y)
+  #   waypoints.append(copy.deepcopy(wpose))
 
-    wpose.position.y -= scale * 0.2  # Third move sideways (y)
-    waypoints.append(copy.deepcopy(wpose))
+  #   wpose.position.x += scale * 0.05  # Second move forward/backwards in (x)
+  #   waypoints.append(copy.deepcopy(wpose))
 
-    #------ mirror
+  #   wpose.position.y -= scale * 0.1  # Third move sideways (y)
+  #   waypoints.append(copy.deepcopy(wpose))
 
-    wpose.position.y += scale * 0.2  # Third move sideways (y)
-    waypoints.append(copy.deepcopy(wpose))
+  #   #------ mirror
 
-    wpose.position.x -= scale * 0.1  # Second move forward/backwards in (x)
-    waypoints.append(copy.deepcopy(wpose))
+  #   wpose.position.y += scale * 0.1  # Third move sideways (y)
+  #   waypoints.append(copy.deepcopy(wpose))
 
-    wpose.position.y -= scale * 0.2  # and sideways (y)
-    wpose.position.z -= scale * 0.1  # First move up (z)
+  #   wpose.position.x -= scale * 0.05  # Second move forward/backwards in (x)
+  #   waypoints.append(copy.deepcopy(wpose))
+
+  #   wpose.position.y -= scale * 0.1  # and sideways (y)
+  #   wpose.position.z -= scale * 0.05  # First move up (z)
     
-    waypoints.append(copy.deepcopy(wpose))
+  #   waypoints.append(copy.deepcopy(wpose))
 
 
-    (plan, fraction) = move_group.compute_cartesian_path(
-                                          waypoints,   # waypoints to follow
-                                          0.01,        # eef_step
-                                          0.0)         # jump_threshold
+  #   (plan, fraction) = move_group.compute_cartesian_path(
+  #                                         waypoints,   # waypoints to follow
+  #                                         0.01,        # eef_step
+  #                                         0.0)         # jump_threshold
 
-    return plan, fraction
+  #   return plan, fraction
 
 
-  def execute_plan(self,plan):
+  # def execute_plan(self, plan):
+  #   move_group = self.move_group
+  #   while not self.stop_flag.is_set():
+  #       move_group.execute(plan, wait=False)
+  #       print("UR3 is moving...")
+  #       time.sleep(1)
+  #   if self.stop_flag.is_set(): move_group.stop()
+  #   print("Movement stopped.")
+    
+
+  # def stop_robot_movement(self):
+  #   self.stop_flag.set()
+
+  def set_pose(self):
+    angle_rad = math.radians(10)
+
+    pose_goal = geometry_msgs.msg.Pose() 
+    pose_goal.orientation.x = 0.0 
+    pose_goal.orientation.y = math.cos(angle_rad)
+    pose_goal.orientation.z = 0.0
+    pose_goal.orientation.w = math.sin(angle_rad)
+    pose_goal.position.x = 0.35
+    pose_goal.position.y = 0.1
+    pose_goal.position.z = 0.12
+
+    self.start_movement(pose_goal)
+    self.pause_flag.clear()
+    print("Start Drawing! \n")
+
+  def start_movement(self,target_pose):
+    self.target_pose = target_pose
+    self.move_thread = threading.Thread(target=self._move_to_target)
+    self.move_thread.start()
+
+  def stop_movement(self):
+    self.stop_flag.set()
+    if self.move_thread:
+        self.move_thread.join()
+        self.move_group.stop()
+
+  def pause_movement(self):
+    self.pause_flag.set()
+    if self.move_thread:
+        self.move_thread.join()
+        self.move_group.stop()
+
+  def _move_to_target(self):
+    rate = rospy.Rate(10)  # Adjust the rate based on your requirements
     move_group = self.move_group
-    move_group.execute(plan, wait=True)
+    while not self.stop_flag.is_set() and not self.pause_flag.is_set():
+      if self.target_pose:
+        move_group.set_pose_target(self.target_pose)
+        plan = move_group.go(wait=False)  # Set wait=False to execute asynchronously
+
+        # Check if the movement plan was successfully executed
+        if plan:
+          move_group.stop()  # Stop any ongoing movement
+          self.target_pose = None  # Reset target pose after movement
+
+
+      rate.sleep()  # Ensure that the loop runs at a specific rate
+
+
+#------------------- End Testing threading
+
 
 
 # def main():

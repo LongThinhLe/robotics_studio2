@@ -15,7 +15,7 @@ class ImageProcessor:
     def __init__(self) -> None:
         # Get the user's home directory
         self.home_directory = os.path.expanduser("~")
-
+        self.cap = None
         # Initialize Webcam
         # Iterate through device indexes until a valid one is found
         for i in range(10):  # Try up to 10 devices
@@ -28,10 +28,13 @@ class ImageProcessor:
         if self.cap is None:
             print("No webcam device found.")
             return
+        
     
     def update_preview(self,canvas_preview, screen_width, screen_height):
         # Capture a frame
         ret, frame = self.cap.read()
+        # ret = None
+        # frame = None
         if ret:
 
             # Convert the frame from BGR to RGB

@@ -26,8 +26,10 @@ class SelfieDrawingApp:
     SCREEN_HEIGHT = 240
 
     def __init__(self, master: tk.Tk):
+        super().__init__()
         self.process = None
         self.master = master
+        
         master.title("Automated Artistic Portraiture")
         master.resizable(False, False)
         master.size
@@ -360,11 +362,11 @@ class SelfieDrawingApp:
         draw_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Pause"
-        pause_button = tk.Button(additional_buttons_frame, text="Pause", font=("Arial", 16))
+        pause_button = tk.Button(additional_buttons_frame, text="Pause", font=("Arial", 16), command= lambda: self.pause_drawing())
         pause_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Stop"
-        stop_button = tk.Button(additional_buttons_frame, text="Stop", font=("Arial", 16))
+        stop_button = tk.Button(additional_buttons_frame, text="Stop", font=("Arial", 16), command=lambda: self.stop_drawing())
         stop_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Run Test"
@@ -440,6 +442,8 @@ class SelfieDrawingApp:
         if all_nodes_process.returncode != 0:
             print("Error killing all ROS nodes")
 
+        rospy.signal_shutdown('Shutting down node running')
+
     def launch_gazebo(self):
         # Construct the command to execute
         command = ['roslaunch', 'ur_gazebo', 'ur3_bringup.launch']
@@ -447,8 +451,12 @@ class SelfieDrawingApp:
         self.process = subprocess.Popen(command) 
     
     def launch_moveit_planning(self):
-        # Construct the command to execute
+        # Construct the command to execute SIMULATION ONLY
         command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
+        
+        # Construct the command to execute REAL ROBOT ONLY
+        # command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
+        
         # Execute the command
         self.process = subprocess.Popen(command) 
 
@@ -462,15 +470,20 @@ class SelfieDrawingApp:
         # Initialize UR3
         self.ur3_operate = UR3_Movement()
 
+
     def homing_ur3(self):
         # Homing robot with specific joint state
         self.ur3_operate.init_joint_state()
 
-    
+
     def start_drawing(self):
-        # self.ur3_operate.gcode_to_pose_goal()
-        cartesian_plan, fraction = self.ur3_operate.plan_cartesian_path()
-        self.ur3_operate.execute_plan(cartesian_plan)
+        self.ur3_operate.set_pose()
+
+    def stop_drawing(self):
+        self.ur3_operate.stop_movement()
+
+    def pause_drawing(self):
+        self.ur3_operate.pause_movement()
 
     def print_ur3_pose(self):
         print("\nCurrent pose:", self.ur3_operate.move_group.get_current_pose().pose)

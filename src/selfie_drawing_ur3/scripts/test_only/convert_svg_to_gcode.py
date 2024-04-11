@@ -25,4 +25,4 @@ def convert_svg_to_gcode(svg_file_name, gcode_file_name):
     gcode_compiler.compile_to_file(gcode_file_path)
 
 if __name__ == "__main__":
-    convert_svg_to_gcode("drawing.svg", "drawing.gcode")
+    convert_svg_to_gcode("/home/lelongthinh/rs2_ws/img/outline_picture_rmbg.svg", "/home/lelongthinh/rs2_ws/gcode/drawing.gcode")
