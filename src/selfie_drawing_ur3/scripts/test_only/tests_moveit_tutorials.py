@@ -188,14 +188,14 @@ class MoveGroupPythonIntefaceTutorial(object):
     waypoints = []
 
     wpose = move_group.get_current_pose().pose
-    wpose.position.z -= scale * 0.1  # First move up (z)
-    wpose.position.y += scale * 0.2  # and sideways (y)
+    wpose.position.z -= scale * 0.05  # First move up (z)
+    wpose.position.y += scale * 0.1  # and sideways (y)
     waypoints.append(copy.deepcopy(wpose))
 
-    wpose.position.x += scale * 0.1  # Second move forward/backwards in (x)
+    wpose.position.x += scale * 0.05  # Second move forward/backwards in (x)
     waypoints.append(copy.deepcopy(wpose))
 
-    wpose.position.y -= scale * 0.1  # Third move sideways (y)
+    wpose.position.y -= scale * 0.05  # Third move sideways (y)
     waypoints.append(copy.deepcopy(wpose))
 
     # We want the Cartesian path to be interpolated at a resolution of 1 cm
@@ -236,7 +236,7 @@ class MoveGroupPythonIntefaceTutorial(object):
     display_trajectory.trajectory_start = robot.get_current_state()
     display_trajectory.trajectory.append(plan)
     # Publish
-    display_trajectory_publisher.publish(display_trajectory);
+    display_trajectory_publisher.publish(display_trajectory)
 
     ## END_SUB_TUTORIAL
 
