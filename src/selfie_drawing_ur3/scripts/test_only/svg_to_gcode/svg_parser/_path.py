@@ -320,3 +320,6 @@ class Path:
 
             if verbose:
                 print(f"{command_key}{tuple(command_arguments)} -> {curve}")
+                
+                
+                

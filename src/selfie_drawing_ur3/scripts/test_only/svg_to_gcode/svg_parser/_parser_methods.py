@@ -104,3 +104,30 @@ def parse_file(file_path: str, transform_origin=True, canvas_height=None, draw_h
         """
     root = ElementTree.parse(file_path).getroot()
     return parse_root(root, transform_origin, canvas_height, draw_hidden)
+
+
+def polyline_to_path(file_name: str):
+    """
+    Convert a polyline to a path element in an SVG file.
+
+    :param file_name: The name of the file to read and write to.
+    """
+    # Read the SVG file
+    with open(file_name, 'r') as file:
+        svg_string = file.read()
+
+    root = ElementTree.fromstring(svg_string)
+
+    for polyline in root.findall('.//{%s}polyline' % NAMESPACES['svg']):
+
+        path = ElementTree.Element('path')
+        path.attrib = polyline.attrib
+
+        path.set('d', f'M {polyline.get("points")}')
+
+        # Replace the polyline with the path
+        polyline.getparent().replace(polyline, path)
+
+    # Write the modified SVG back to the file
+    with open(file_name, 'w') as file:
+        file.write(ElementTree.tostring(root, encoding='unicode'))
