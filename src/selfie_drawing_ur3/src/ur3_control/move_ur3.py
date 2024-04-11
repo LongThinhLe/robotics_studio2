@@ -79,6 +79,7 @@ class UR3_Movement(object):
         self.stop_flag.clear()
         self.pause_flag = threading.Event() 
         self.pause_flag.clear()
+        self._stop_event = threading.Event()
 
     except rospy.ROSException as e:
         print("Error initializing UR3_Movement:", str(e))
@@ -217,7 +218,7 @@ class UR3_Movement(object):
       print("\nPose Information:", self.move_group.get_current_pose().pose)
 
 
-#------------------- Start Testing threading
+#-------------------  Movement threading
 
   # def plan_cartesian_path(self,scale = 1):
   #   move_group = self.move_group
@@ -319,7 +320,12 @@ class UR3_Movement(object):
       rate.sleep()  # Ensure that the loop runs at a specific rate
 
 
-#------------------- End Testing threading
+#------------------- Update TCP threading
+  def update_robot_tcp_thread(self):
+    while not self._stop_event.is_set():
+      
+
+
 
 
 

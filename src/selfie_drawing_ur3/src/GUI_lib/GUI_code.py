@@ -69,6 +69,9 @@ class SelfieDrawingApp:
         # Initialize Icon for application
         self.init_icon()
 
+        # Bind closing event to stop the robot thread
+        master.protocol("WM_DELETE_WINDOW", self.close_window)
+
 
     #-------------------- Init Icon App
     def init_icon(self):
@@ -379,8 +382,6 @@ class SelfieDrawingApp:
 
 
 
-
-
     #-------------------- Buttons for Robot
     def connect_to_robot(self):
         # Get the IP address from the entry widget
@@ -391,7 +392,6 @@ class SelfieDrawingApp:
 
         # Execute the command
         self.process = subprocess.Popen(command)
-
 
     def disconnect_from_robot(self):
         # # Terminate the process if it exists
@@ -470,11 +470,9 @@ class SelfieDrawingApp:
         # Initialize UR3
         self.ur3_operate = UR3_Movement()
 
-
     def homing_ur3(self):
         # Homing robot with specific joint state
         self.ur3_operate.init_joint_state()
-
 
     def start_drawing(self):
         self.ur3_operate.set_pose()
@@ -489,7 +487,8 @@ class SelfieDrawingApp:
         print("\nCurrent pose:", self.ur3_operate.move_group.get_current_pose().pose)
 
 
-
+    #------------------- Update TCP of UR3 Threading
+    # def update_tcp_gui_thread(self):
 
 
 
@@ -527,7 +526,6 @@ class SelfieDrawingApp:
 
     def set_countdown(self,seconds):
         self.countdown_value = seconds
-
 
     #-------------------- Buttons for Image Processing
     def button_pressed(self, event):
@@ -567,6 +565,9 @@ class SelfieDrawingApp:
 
     def process_img(self):
         self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image)
+
+
+    #--------------------- Buttons for Gcode processing
 
     def generate_gcode(self): # convert SVG file to Gcode
         # Check if the svg file exists
@@ -642,6 +643,13 @@ class SelfieDrawingApp:
         center_y = (min_y + max_y) / 2
         return center_x, center_y
     
+
+    #--------------------- End threads when close GUI
+    def close_window(self):
+        # Stop the robot thread when GUI is closed
+        self.ur3_operate.move_thread.stop()
+        self.update_tcp_gui_thread.stop()
+        self.master.destroy()
 
 
 def main():
