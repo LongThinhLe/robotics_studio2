@@ -69,8 +69,6 @@ class SelfieDrawingApp:
         # Initialize Icon for application
         self.init_icon()
 
-        # Bind closing event to stop the robot thread
-        master.protocol("WM_DELETE_WINDOW", self.close_window)
 
 
     #-------------------- Init Icon App
@@ -297,19 +295,19 @@ class SelfieDrawingApp:
         coordinates_frame.pack()
 
         # Create labels to display the coordinates
-        lbl_x = tk.Label(coordinates_frame, text="X:{:.2f} mm".format(self.x_tcp), font=("Arial", 16))
-        lbl_y = tk.Label(coordinates_frame, text="Y:{:.2f} mm".format(self.y_tcp), font=("Arial", 16))
-        lbl_z = tk.Label(coordinates_frame, text="Z:{:.2f} mm".format(self.z_tcp), font=("Arial", 16))
-        lbl_rx = tk.Label(coordinates_frame, text="Rx:{:.2f} deg".format(self.rx_tcp), font=("Arial", 16))
-        lbl_ry = tk.Label(coordinates_frame, text="Ry:{:.2f} deg".format(self.ry_tcp), font=("Arial", 16))
-        lbl_rz = tk.Label(coordinates_frame, text="Rz:{:.2f} deg".format(self.rz_tcp), font=("Arial", 16))
+        self.lbl_x = tk.Label(coordinates_frame, text="X:{:.2f} mm".format(self.x_tcp), font=("Arial", 16))
+        self.lbl_y = tk.Label(coordinates_frame, text="Y:{:.2f} mm".format(self.y_tcp), font=("Arial", 16))
+        self.lbl_z = tk.Label(coordinates_frame, text="Z:{:.2f} mm".format(self.z_tcp), font=("Arial", 16))
+        self.lbl_rx = tk.Label(coordinates_frame, text="Rx:{:.2f} rad".format(self.rx_tcp), font=("Arial", 16))
+        self.lbl_ry = tk.Label(coordinates_frame, text="Ry:{:.2f} rad".format(self.ry_tcp), font=("Arial", 16))
+        self.lbl_rz = tk.Label(coordinates_frame, text="Rz:{:.2f} rad".format(self.rz_tcp), font=("Arial", 16))
 
-        lbl_x.grid(row=0, column=0, padx=5)
-        lbl_y.grid(row=1, column=0, padx=5)
-        lbl_z.grid(row=2, column=0, padx=5)
-        lbl_rx.grid(row=0, column=1, padx=5)
-        lbl_ry.grid(row=1, column=1, padx=5)
-        lbl_rz.grid(row=2, column=1, padx=5)
+        self.lbl_x.grid(row=0, column=0, padx=5)
+        self.lbl_y.grid(row=1, column=0, padx=5)
+        self.lbl_z.grid(row=2, column=0, padx=5)
+        self.lbl_rx.grid(row=0, column=1, padx=5)
+        self.lbl_ry.grid(row=1, column=1, padx=5)
+        self.lbl_rz.grid(row=2, column=1, padx=5)
 
 
         #------------------------------------------- Terminate button
@@ -347,13 +345,16 @@ class SelfieDrawingApp:
 
         #--------------------------------------------- Homing
         # Create a frame for Robot Homing
-        homing_button_frame = tk.Frame(self.tab_robot_draw)
-        homing_button_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
+        set_button_frame = tk.Frame(self.tab_robot_draw)
+        set_button_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
 
         # Create a button for "Init"
-        homing_button = tk.Button(homing_button_frame, text="Homing", font=("Arial", 16), width= 52, command= lambda: self.homing_ur3())
+        homing_button = tk.Button(set_button_frame, text="Homing", font=("Arial", 16), width= 24, command= lambda: self.homing_ur3())
         homing_button.pack(side=tk.LEFT, padx=10)
 
+        # Create a button for "Set Zero Position" / "Set Origin"
+        set_origin_button = tk.Button(set_button_frame, text= "Set Origin", font=("Arial", 16), width= 24, command= lambda: self.set_origin_ur3())
+        set_origin_button.pack(side=tk.LEFT, padx=10)
 
         #--------------------------------------------- Draw Buttons
         # Create a frame for drawing buttons
@@ -373,7 +374,7 @@ class SelfieDrawingApp:
         stop_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Run Test"
-        run_test_button = tk.Button(additional_buttons_frame, text="Run Test", font=("Arial", 16))
+        run_test_button = tk.Button(additional_buttons_frame, text="Release Stop", font=("Arial", 16), command=lambda: self.release_stop())
         run_test_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Print Pose"
@@ -470,25 +471,60 @@ class SelfieDrawingApp:
         # Initialize UR3
         self.ur3_operate = UR3_Movement()
 
+        # Start get thread Robot TCP
+        self.ur3_operate.update_robot_tcp_thread()
+
+        # Start update thread Robot TCP
+        self.init_update_tcp_thread()
+    
+
     def homing_ur3(self):
         # Homing robot with specific joint state
-        self.ur3_operate.init_joint_state()
+        self.ur3_operate.homing_ur3()
 
     def start_drawing(self):
         self.ur3_operate.set_pose()
+    
+    def pause_drawing(self):
+        self.ur3_operate.pause_movement()
 
     def stop_drawing(self):
         self.ur3_operate.stop_movement()
 
-    def pause_drawing(self):
-        self.ur3_operate.pause_movement()
+    def release_stop(self):
+        self.ur3_operate.release_stop_event()
 
     def print_ur3_pose(self):
         print("\nCurrent pose:", self.ur3_operate.move_group.get_current_pose().pose)
 
 
     #------------------- Update TCP of UR3 Threading
-    # def update_tcp_gui_thread(self):
+    def init_update_tcp_thread(self):
+        self.update_gui_thread = threading.Thread(target= self._update_tcp_gui)
+        self.update_gui_thread.start()
+
+    def _update_tcp_gui(self):
+        rate = rospy.Rate(10)
+        
+        while True:
+            tcp_pose_x, tcp_pose_y, tcp_pose_z, tcp_ori_x, tcp_ori_y, tcp_ori_z = self.ur3_operate.get_tcp()
+
+            self.x_tcp = tcp_pose_x
+            self.y_tcp = tcp_pose_y
+            self.z_tcp = tcp_pose_z
+            self.x_ori = tcp_ori_x
+            self.y_ori = tcp_ori_y
+            self.z_ori = tcp_ori_z
+
+            # Update TCP coordinates in the GUI labels
+            self.lbl_x.config(text="X:{:.2f} mm".format(self.x_tcp))
+            self.lbl_y.config(text="Y:{:.2f} mm".format(self.y_tcp))
+            self.lbl_z.config(text="Z:{:.2f} mm".format(self.z_tcp))
+            self.lbl_rx.config(text="Rx:{:.2f} rad".format(self.x_ori))
+            self.lbl_ry.config(text="Ry:{:.2f} rad".format(self.y_ori))
+            self.lbl_rz.config(text="Rz:{:.2f} rad".format(self.z_ori))
+            rate.sleep()
+        
 
 
 
@@ -566,7 +602,6 @@ class SelfieDrawingApp:
     def process_img(self):
         self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image)
 
-
     #--------------------- Buttons for Gcode processing
 
     def generate_gcode(self): # convert SVG file to Gcode
@@ -643,14 +678,6 @@ class SelfieDrawingApp:
         center_y = (min_y + max_y) / 2
         return center_x, center_y
     
-
-    #--------------------- End threads when close GUI
-    def close_window(self):
-        # Stop the robot thread when GUI is closed
-        self.ur3_operate.move_thread.stop()
-        self.update_tcp_gui_thread.stop()
-        self.master.destroy()
-
 
 def main():
     root = tk.Tk()

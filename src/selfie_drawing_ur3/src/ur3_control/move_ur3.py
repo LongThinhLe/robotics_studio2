@@ -2,7 +2,6 @@
 
 import sys
 import rospy
-import copy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
@@ -12,8 +11,6 @@ from moveit_commander.conversions import pose_to_list
 import numpy as np
 
 import threading 
-import time
-
 
 def all_close(goal, actual, tolerance):
   """
@@ -44,7 +41,6 @@ class UR3_Movement(object):
     try:
         # First, initialize rospy node
         rospy.init_node('selfie_drawing_ur3_movement', anonymous=True)
-
         # Then initialize MoveIt components
         moveit_commander.roscpp_initialize(sys.argv)
 
@@ -79,7 +75,6 @@ class UR3_Movement(object):
         self.stop_flag.clear()
         self.pause_flag = threading.Event() 
         self.pause_flag.clear()
-        self._stop_event = threading.Event()
 
     except rospy.ROSException as e:
         print("Error initializing UR3_Movement:", str(e))
@@ -219,56 +214,14 @@ class UR3_Movement(object):
 
 
 #-------------------  Movement threading
+  def homing_ur3(self):
+    move_group = self.move_group
+    joint_goal = move_group.get_current_joint_values()
+    joint_deg = [20, -100, -125, -26, -280, 20]
+    joint_goal = np.deg2rad(joint_deg)
 
-  # def plan_cartesian_path(self,scale = 1):
-  #   move_group = self.move_group
-  #   waypoints = []
+    self.start_movement(joint_goal)
 
-  #   wpose = move_group.get_current_pose().pose
-  #   wpose.position.z += scale * 0.05  # First move up (z)
-  #   wpose.position.y += scale * 0.1  # and sideways (y)
-  #   waypoints.append(copy.deepcopy(wpose))
-
-  #   wpose.position.x += scale * 0.05  # Second move forward/backwards in (x)
-  #   waypoints.append(copy.deepcopy(wpose))
-
-  #   wpose.position.y -= scale * 0.1  # Third move sideways (y)
-  #   waypoints.append(copy.deepcopy(wpose))
-
-  #   #------ mirror
-
-  #   wpose.position.y += scale * 0.1  # Third move sideways (y)
-  #   waypoints.append(copy.deepcopy(wpose))
-
-  #   wpose.position.x -= scale * 0.05  # Second move forward/backwards in (x)
-  #   waypoints.append(copy.deepcopy(wpose))
-
-  #   wpose.position.y -= scale * 0.1  # and sideways (y)
-  #   wpose.position.z -= scale * 0.05  # First move up (z)
-    
-  #   waypoints.append(copy.deepcopy(wpose))
-
-
-  #   (plan, fraction) = move_group.compute_cartesian_path(
-  #                                         waypoints,   # waypoints to follow
-  #                                         0.01,        # eef_step
-  #                                         0.0)         # jump_threshold
-
-  #   return plan, fraction
-
-
-  # def execute_plan(self, plan):
-  #   move_group = self.move_group
-  #   while not self.stop_flag.is_set():
-  #       move_group.execute(plan, wait=False)
-  #       print("UR3 is moving...")
-  #       time.sleep(1)
-  #   if self.stop_flag.is_set(): move_group.stop()
-  #   print("Movement stopped.")
-    
-
-  # def stop_robot_movement(self):
-  #   self.stop_flag.set()
 
   def set_pose(self):
     angle_rad = math.radians(10)
@@ -282,9 +235,9 @@ class UR3_Movement(object):
     pose_goal.position.y = 0.1
     pose_goal.position.z = 0.12
 
-    self.start_movement(pose_goal)
     self.pause_flag.clear()
-    print("Start Drawing! \n")
+    self.start_movement(pose_goal)
+
 
   def start_movement(self,target_pose):
     self.target_pose = target_pose
@@ -303,27 +256,61 @@ class UR3_Movement(object):
         self.move_thread.join()
         self.move_group.stop()
 
+  def release_stop_event(self):
+    # Reset the stop flag after homing
+    self.stop_flag.clear()
+    self.pause_flag.clear()
+
   def _move_to_target(self):
     rate = rospy.Rate(10)  # Adjust the rate based on your requirements
     move_group = self.move_group
     while not self.stop_flag.is_set() and not self.pause_flag.is_set():
-      if self.target_pose:
-        move_group.set_pose_target(self.target_pose)
-        plan = move_group.go(wait=False)  # Set wait=False to execute asynchronously
+      if type(self.target_pose) is geometry_msgs.msg.Pose: # Moving with Pose
+        if self.target_pose:
+          move_group.set_pose_target(self.target_pose)
+          plan = move_group.go(wait=False)  # Set wait=False to execute asynchronously
 
-        # Check if the movement plan was successfully executed
-        if plan:
-          move_group.stop()  # Stop any ongoing movement
-          self.target_pose = None  # Reset target pose after movement
+          # Check if the movement plan was successfully executed
+          if plan:
+            move_group.stop()  # Stop any ongoing movement
+            self.target_pose = None  # Reset target pose after movement
 
+      else: # Moving with Joint angles
+        if np.all(self.target_pose):
+          move_group.set_joint_value_target(self.target_pose)
+          plan = move_group.go(wait=False) 
+
+          if plan:
+            move_group.stop()
+            self.target_pose = None
 
       rate.sleep()  # Ensure that the loop runs at a specific rate
 
 
 #------------------- Update TCP threading
   def update_robot_tcp_thread(self):
-    while not self._stop_event.is_set():
-      
+    self.update_tcp_thread = threading.Thread(target= self._get_robot_tcp)
+    self.update_tcp_thread.start()
+
+  def get_tcp(self):
+    return self.tcp_pose_x, self.tcp_pose_y, self.tcp_pose_z, self.tcp_ori_x, self.tcp_ori_y, self.tcp_ori_z
+
+  def _get_robot_tcp(self):
+    rate = rospy.Rate(10)
+
+    while True:
+      self.tcp_pose = self.move_group.get_current_pose().pose
+      tcp_pose = self.tcp_pose
+      self.tcp_pose_x = tcp_pose.position.x
+      self.tcp_pose_y = tcp_pose.position.y
+      self.tcp_pose_z = tcp_pose.position.z
+
+      self.tcp_ori_x = tcp_pose.orientation.x
+      self.tcp_ori_y = tcp_pose.orientation.y
+      self.tcp_ori_z = tcp_pose.orientation.z
+
+      rate.sleep()
+
 
 
 
