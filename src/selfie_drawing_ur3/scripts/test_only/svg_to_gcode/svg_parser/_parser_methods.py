@@ -15,62 +15,36 @@ def _has_style(element: ElementTree.Element, key: str, value: str) -> bool:
     return element.get(key) == value or (element.get("style") and f"{key}:{value}" in element.get("style"))
 
 
-# Todo deal with viewBoxes
 def parse_root(root: ElementTree.Element, transform_origin=True, canvas_height=None, draw_hidden=False,
                visible_root=True, root_transformation=None) -> List[Curve]:
-
-    """
-    Recursively parse an etree root's children into geometric curves.
-
-    :param root: The etree element who's children should be recursively parsed. The root will not be drawn.
-    :param canvas_height: The height of the canvas. By default the height attribute of the root is used. If the root
-    does not contain the height attribute, it must be either manually specified or transform must be False.
-    :param transform_origin: Whether or not to transform input coordinates from the svg coordinate system to standard
-    cartesian system. Depends on canvas_height for calculations.
-    :param draw_hidden: Whether or not to draw hidden elements based on their display, visibility and opacity attributes.
-    :param visible_root: Specifies whether or the root is visible. (Inheritance can be overridden)
-    :param root_transformation: Specifies whether the root's transformation. (Transformations are inheritable)
-    :return: A list of geometric curves describing the svg. Use the Compiler sub-module to compile them to gcode.
-    """
-
+    """ Recursively parse an etree root's children into geometric curves. """
     if canvas_height is None:
-        height_str = root.get("height")
-        canvas_height = float(height_str) if height_str.isnumeric() else float(height_str[:-2])
+        height_str = root.get("height", '100px').replace('px', '')
+        canvas_height = float(height_str)
 
     curves = []
 
-    # Draw visible elements (Depth-first search)
-    for element in list(root):
+    for element in root.findall('.//*'):
+        tag = element.tag.split('}')[-1]  # Handling namespace by splitting off the URI
 
-        # display cannot be overridden by inheritance. Just skip the element
-        display = _has_style(element, "display", "none")
-
-        if display or element.tag == "{%s}defs" % NAMESPACES["svg"]:
+        if tag == 'defs' or _has_style(element, "display", "none"):
             continue
 
-        transformation = deepcopy(root_transformation) if root_transformation else None
-
         transform = element.get('transform')
+        transformation = deepcopy(root_transformation) if root_transformation else Transformation()
         if transform:
-            transformation = Transformation() if transformation is None else transformation
             transformation.add_transform(transform)
 
-        # Is the element and it's root not hidden?
-        visible = visible_root and not (_has_style(element, "visibility", "hidden")
-                                        or _has_style(element, "visibility", "collapse"))
-        # Override inherited visibility
-        visible = visible or (_has_style(element, "visibility", "visible"))
+        visible = not any([_has_style(element, "visibility", "hidden"),
+                           _has_style(element, "visibility", "collapse")]) or _has_style(element, "visibility", "visible")
 
-        # If the current element is opaque and visible, draw it
         if draw_hidden or visible:
-            if element.tag == "{%s}path" % NAMESPACES["svg"]:
-                path = Path(element.attrib['d'], canvas_height, transform_origin, transformation)
-                curves.extend(path.curves)
+            if tag == 'path':
+                path_d = element.get('d')
+                if path_d:
+                    path = Path(path_d, canvas_height, transform_origin, transformation)
+                    curves.extend(path.curves)
 
-        # Continue the recursion
-        curves.extend(parse_root(element, transform_origin, canvas_height, draw_hidden, visible, transformation))
-
-    # ToDo implement shapes class
     return curves
 
 
@@ -102,32 +76,41 @@ def parse_file(file_path: str, transform_origin=True, canvas_height=None, draw_h
             :param draw_hidden: Whether or not to draw hidden elements based on their display, visibility and opacity attributes.
             :return: A list of geometric curves describing the svg. Use the Compiler sub-module to compile them to gcode.
         """
-    root = ElementTree.parse(file_path).getroot()
-    return parse_root(root, transform_origin, canvas_height, draw_hidden)
+    tree = ElementTree.parse(file_path)
+    root = tree.getroot()
+    svg_root = convert_polyline_to_path(root)
+    
+    return parse_root(svg_root, transform_origin, canvas_height, draw_hidden)
 
 
-def polyline_to_path(file_name: str):
-    """
-    Convert a polyline to a path element in an SVG file.
+def find_parent(root, child):
+    for parent in root.iter():
+        for elem in parent:
+            if elem == child:
+                return parent
+    return None  # if no parent found
 
-    :param file_name: The name of the file to read and write to.
-    """
-    # Read the SVG file
-    with open(file_name, 'r') as file:
-        svg_string = file.read()
-
-    root = ElementTree.fromstring(svg_string)
-
-    for polyline in root.findall('.//{%s}polyline' % NAMESPACES['svg']):
+def convert_polyline_to_path(svg_root):
+    ns = {'svg': 'http://www.w3.org/2000/svg'}
+    polylines = list(svg_root.findall('.//svg:polyline', namespaces=ns))
+    for polyline in polylines:
+        points = polyline.get('points').strip()
+        points_list = points.split()
+        path_d = "M" + " L".join(points_list) + " z"
 
         path = ElementTree.Element('path')
-        path.attrib = polyline.attrib
+        path.set('d', path_d)
+        if polyline.get('style'):
+            path.set('style', polyline.get('style'))
+        if polyline.get('stroke'):
+            path.set('stroke', polyline.get('stroke'))
+        if polyline.get('fill'):
+            path.set('fill', polyline.get('fill', 'none'))  # Default to none if not specified
 
-        path.set('d', f'M {polyline.get("points")}')
+        # Use the helper function to find the parent
+        parent = find_parent(svg_root, polyline)
+        if parent is not None:
+            parent.insert(list(parent).index(polyline), path)
+            parent.remove(polyline)
 
-        # Replace the polyline with the path
-        polyline.getparent().replace(polyline, path)
-
-    # Write the modified SVG back to the file
-    with open(file_name, 'w') as file:
-        file.write(ElementTree.tostring(root, encoding='unicode'))
+    return svg_root
