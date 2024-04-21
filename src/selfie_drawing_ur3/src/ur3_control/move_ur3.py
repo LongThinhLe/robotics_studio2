@@ -2,10 +2,10 @@
 
 import sys
 import rospy
+import copy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
-import math
 from math import pi
 from moveit_commander.conversions import pose_to_list
 import numpy as np
@@ -15,25 +15,44 @@ import threading
 def all_close(goal, actual, tolerance):
   """
   Convenience method for testing if a list of values are within a tolerance of their counterparts in another list
-  @param: goal       A list of floats, a Pose or a PoseStamped
-  @param: actual     A list of floats, a Pose or a PoseStamped
+  @param: goal       A list of floats, a numpy array, a Pose or a PoseStamped
+  @param: actual     A list of floats, a numpy array, a Pose or a PoseStamped
   @param: tolerance  A float
   @returns: bool
   """
-  all_equal = True
-  if type(goal) is list:
-    for index in range(len(goal)):
-      if abs(actual[index] - goal[index]) > tolerance:
-        return False
-
-  elif type(goal) is geometry_msgs.msg.PoseStamped:
-    return all_close(goal.pose, actual.pose, tolerance)
-
-  elif type(goal) is geometry_msgs.msg.Pose:
-    return all_close(pose_to_list(goal), pose_to_list(actual), tolerance)
-
+  if isinstance(goal, (list, np.ndarray)) and isinstance(actual, (list, np.ndarray)):
+      # If both are lists or numpy arrays, compare element-wise
+      if isinstance(goal, list):
+          goal = np.array(goal)
+      if isinstance(actual, list):
+          actual = np.array(actual)
+      return np.all(np.abs(actual - goal) <= tolerance)
+  elif isinstance(goal, geometry_msgs.msg.PoseStamped) and isinstance(actual, geometry_msgs.msg.PoseStamped):
+      return all_close(goal.pose, actual.pose, tolerance)
+  elif isinstance(goal, geometry_msgs.msg.Pose) and isinstance(actual, geometry_msgs.msg.Pose):
+      # Compare positions
+      if not all_close_position(goal.position, actual.position, tolerance):
+          return False
+      # Compare orientations (quaternions)
+      if not all_close_orientation(goal.orientation, actual.orientation, tolerance):
+          return False
+  else:
+      # Unsupported types
+      return False
   return True
 
+def all_close_position(goal_pos, actual_pos, tolerance):
+    return np.allclose([goal_pos.x, goal_pos.y, goal_pos.z], [actual_pos.x, actual_pos.y, actual_pos.z], atol=tolerance)
+
+def all_close_orientation(goal_ori, actual_ori, tolerance):
+    goal_quat = np.array([goal_ori.x, goal_ori.y, goal_ori.z, goal_ori.w])
+    actual_quat = np.array([actual_ori.x, actual_ori.y, actual_ori.z, actual_ori.w])
+    # Calculate the quaternion difference
+    quaternion_diff = np.abs(goal_quat - actual_quat)
+    # Ensure that quaternion_diff is within 2*pi of the correct value
+    quaternion_diff = np.minimum(quaternion_diff, 2 * np.pi - quaternion_diff)
+    # Check if all elements of the quaternion difference are within tolerance
+    return np.all(quaternion_diff < tolerance)
 
 class UR3_Movement(object):
 
@@ -70,147 +89,212 @@ class UR3_Movement(object):
         self.target_pose = None
         self.move_thread = None
         self.paused_pose = None
+        self.goal_pose_list = [] # List of goal pose
 
         self.stop_flag = threading.Event()  # Event to signal stop
         self.stop_flag.clear()
-        self.pause_flag = threading.Event() 
-        self.pause_flag.clear()
+
+
+
+        self.completeGoal_flag = threading.Event()
+        self.completeGoal_flag.clear() # clear is not finished, set is finished
+
+        self._is_running = threading.Event()
+        self._is_running.clear() # clear is not running, set is running
+
+        self.check_goal_reached_thread = threading.Thread(target=self._check_goal_reached)
+        self.check_goal_reached_thread.start()
+
+        # self.check_goals_thread = threading.Thread(target=self._check_goal_pose_list)
+        # self.check_goals_thread.start()
+
 
     except rospy.ROSException as e:
         print("Error initializing UR3_Movement:", str(e))
 
 
-  def init_joint_state(self):
+  def _check_goal_pose_list(self):
+    """
+    Check if there is a goal pose/joint in self.goal_pose_list.
+    If a goal exists, set it as self.target_pose for robot movement.
+    If the goal is a pose, convert it to a numpy array before setting.
+    """
+    rate = rospy.Rate(10)
+    while True:
+      if self.goal_pose_list:
+        # Get the first goal from the list
+        goal = self.goal_pose_list[0]
+        self.target_pose = goal
 
-    move_group = self.move_group
-    joint_goal = move_group.get_current_joint_values()
-    joint_deg = [20, -100, -125, -26, -280, 20]
-    joint_goal = np.deg2rad(joint_deg)
-    print ("Start threading inside init joint state")
-
-    move_group.go(joint_goal, wait=True)
-
-    move_group.stop()
-    
-    # Reset the stop flag after homing
-    self.stop_flag.clear()
-    self.pause_flag.clear()
-
-    # For testing:
-    current_joints = move_group.get_current_joint_values()
-    return all_close(joint_goal, current_joints, 0.01)
-  
-
-  def init_pose(self):
-
-    move_group = self.move_group
-
-    angle_rad = math.radians(10)
-
-    ## Learn deeply at: https://eater.net/quaternions/video/intro   
-    pose_goal = geometry_msgs.msg.Pose() 
-    pose_goal.orientation.x = 0.0 
-    pose_goal.orientation.y = math.cos(angle_rad)
-    pose_goal.orientation.z = 0.0
-    pose_goal.orientation.w = math.sin(angle_rad)
-    pose_goal.position.x = 0.35
-    pose_goal.position.y = 0.1
-    pose_goal.position.z = 0.12
-
-    move_group.set_pose_target(pose_goal)
-
-    ## Now, we call the planner to compute the plan and execute it.
-    plan = move_group.go(wait=True)
-    move_group.stop()
-    move_group.clear_pose_targets()
-
-    current_pose = self.move_group.get_current_pose().pose
-    return all_close(pose_goal, current_pose, 0.01)
-  
-
-  def list_pose_goal(self):
-    move_group = self.move_group
-    pose_goal = geometry_msgs.msg.Pose() 
-    pose_goal_positions = [
-        [0.35, 0.1, 0.1],  
-        [0.35, (0.1-(297/1000)/2), 0.1],
-        [0.35+210/2000, (0.1-(297/1000)/2), 0.1],
-        [0.35+210/2000, (0.1-(297/1000)/2) + 297/1000, 0.1],
-        [0.35, (0.1-(297/1000)/2) + 297/1000, 0.1],
-        [0.35, 0.1, 0.1],
-        [0.35, 0.1, 0.105],
-    ]
-
-    angle_rad = math.radians(10)
-    pose_goal.orientation.x = 0.0 
-    pose_goal.orientation.y = math.cos(angle_rad)
-    pose_goal.orientation.z = 0.0
-    pose_goal.orientation.w = math.sin(angle_rad)
+        # Wait for completion
+        self.completeGoal_flag.wait()
 
 
-    for position in pose_goal_positions:
-      pose_goal.position.x = position[0]
-      pose_goal.position.y = position[1]
-      pose_goal.position.z = position[2]
 
-      move_group.set_pose_target(pose_goal)
-      plan = move_group.go(wait=True)
-      move_group.stop()
-      move_group.clear_pose_targets()
+        # REmove the goal from the list
+        self.goal_pose_list.pop(0)
+      
+
+        # if isinstance(goal, geometry_msgs.msg.Pose):
+        #   # If the goal is a pose, convert it to a numpy array
+        #   self.target_pose = pose_to_list(goal)
+        # else:
+        #   # If the goal is a joint, directly set it as the target pose
+        #   self.target_pose = goal
 
 
-  def gcode_to_pose_goal(self):
-    move_group = self.move_group
-    pose_goal = geometry_msgs.msg.Pose()
-    pose_goal_positions = []
+      # if len(self.goal_pose_list) != 0: # = if self.goal_pose_list : is empty / if not self.goal_pose_list : is not empty
+      #   print("inside goal pose list")
+      #   if self.target_pose is None:
+      #     print("Set Target Pose\n")
+      #     # Remove and return the first goal pose from the list
+      #     next_goal_pose = self.goal_pose_list.pop(0)
 
-    gcode_commands = [
-        "G1 X0.35 Y0.1 Z0.1",
-        "G1 X0.35 Y-0.0485 Z0.1",
-        "G1 X0.455 Y-0.0485 Z0.1",
-        "G1 X0.455 Y0.2485 Z0.1",
-        "G1 X0.35 Y0.2485 Z0.1",
-        "G1 X0.35 Y0.1 Z0.1",
-        "G1 X0.35 Y0.1 Z0.105"
-        # Add more GCode commands here as needed
-    ]
+      #     # Assign the first goal pose to self.target_pose
+      #     self.target_pose = next_goal_pose
+      #     print(self.target_pose)
 
-    for command in gcode_commands:
-        # Parse GCode command to extract movement information
-        if command.startswith('G1'):
-            # Example assumption: G1 commands are used for linear movement
-            # Extract X, Y, and Z coordinates from the command
-            x = float(command.split('X')[1].split(' ')[0])
-            y = float(command.split('Y')[1].split(' ')[0])
-            z = float(command.split('Z')[1].split(' ')[0])
+      rate.sleep()
 
-            # print ("\nx = ", x)
-            # print ("\ny = ", y)
-            # print ("\nz = ", z)
-            # Update current position
-            current_position = [x, y, z]
+#------------------- Draw from Gcode file
 
-            # Append current position to pose_goal_positions
-            pose_goal_positions.append(current_position)
-    print (pose_goal_positions)
+  def test_drawing_cartesian_path(self,scale = 1):
+    waypoints = []
 
-    angle_rad = math.radians(10)
-    pose_goal.orientation.x = 0.0 
-    pose_goal.orientation.y = math.cos(angle_rad)
-    pose_goal.orientation.z = 0.0
-    pose_goal.orientation.w = math.sin(angle_rad)
-       
+    wpose = self.move_group.get_current_pose().pose
 
-    for position in pose_goal_positions:
-      pose_goal.position.x = position[0]
-      pose_goal.position.y = position[1]
-      pose_goal.position.z = position[2]
+    list_length = len(self.goal_pose_list[0])
+    for i in range (min(10, list_length)):
+      wpose.position.z = scale * self.goal_pose_list[0][i][2]
+      waypoints.append(copy.deepcopy(wpose))
 
-      move_group.set_pose_target(pose_goal)
-      plan = move_group.go(wait=True)
-      move_group.stop()
-      move_group.clear_pose_targets()
-      print("\nPose Information:", self.move_group.get_current_pose().pose)
+      wpose.position.x = scale * self.goal_pose_list[0][i][0]
+      wpose.position.y = scale * self.goal_pose_list[0][i][1]
+      waypoints.append(copy.deepcopy(wpose))
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints, 0.005, 0.0)
+    self.move_group.execute(plan, wait = False)
+
+    # Still use minus offset !!!
+
+
+
+
+    # waypoints = []
+
+    # current_pose = self.move_group.get_current_pose().pose
+    # current_x = current_pose.position.x
+    # current_y = current_pose.position.y
+    # current_z = current_pose.position.z
+
+    # print ("Current Z = ", current_z)
+    # print ("Next Z = ", self.goal_pose_list[0][0][2])
+
+    # offset_x = self.goal_pose_list[0][0][0] - current_x
+    # offset_y = self.goal_pose_list[0][0][1] - current_y
+    # offset_z = self.goal_pose_list[0][0][2] - current_z
+
+    # print ("Offset z = ", offset_z)
+
+
+    # wpose = copy.deepcopy(current_pose)
+    # # Update z position
+    # wpose.position.z = scale * offset_z
+    # waypoints.append(copy.deepcopy(wpose))
+
+    # wpose.position.x = scale * offset_x
+    # wpose.position.y = scale * offset_y
+    # waypoints.append(copy.deepcopy(wpose))
+
+    # print ("Waypoint position z = ", wpose.position.z)
+
+    # list_length = len(self.goal_pose_list[0]) 
+    # for i in range (min(10, list_length)):
+    #   for j in range(3):
+        
+
+
+    # waypoints = []
+
+    # # Extract current position
+    # current_pose = self.move_group.get_current_pose().pose
+    # current_x = current_pose.position.x
+    # current_y = current_pose.position.y
+    # current_z = current_pose.position.z
+
+    # offset_x = self.goal_pose_list[0][0] - current_x
+    # offset_y = goal_pose[1] - current_y
+    # offset_z = goal_pose[2] - current_z
+
+
+
+    # # Loop through goal poses
+    # for goal_pose in self.goal_pose_list[0][:10]:
+    #   # Calculate offset
+    #   offset_x = goal_pose[0] - current_x
+    #   offset_y = goal_pose[1] - current_y
+    #   offset_z = goal_pose[2] - current_z
+
+
+    #   # Update current position
+    #   current_x = goal_pose[0]
+    #   current_y = goal_pose[1]
+    #   current_z = goal_pose[2]
+
+    #   # Create a new waypoint
+    #   wpose = copy.deepcopy(current_pose)
+
+    #   # Update z position
+    #   wpose.position.z += scale * offset_z
+    #   waypoints.append(copy.deepcopy(wpose))
+
+    #   # Update x position
+    #   wpose.position.x += scale * offset_x
+    #   wpose.position.y += scale * offset_y
+    #   waypoints.append(copy.deepcopy(wpose))
+
+    # print ("\n\nTHIS IS OUR WAY POINTS HAHA: \n")
+    # for point in waypoints:
+    #    print(f"X: {point.position.x}, Y: {point.position.y}, Z: {point.position.z}")
+
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints, 0.005, 0.0)
+
+    # self.move_group.execute(plan, wait=False)
+     
+
+    # TESTING HERE:
+    # waypoints = []
+
+    # wpose = self.move_group.get_current_pose().pose
+    # wpose.position.z += scale * 0.02
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose.position.y += scale * 0.15
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose.position.y -= scale * 0.3
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose.position.y += scale * 0.15
+    # waypoints.append(copy.deepcopy(wpose))
+    # wpose.position.z -= scale * 0.02
+    # waypoints.append(copy.deepcopy(wpose))
+
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints, 0.005, 0.0)
+
+    # self.move_group.execute(plan, wait = False)
+    # print ("Self Goal Pose List--------------: ", self.goal_pose_list)
+
+    # print("self.goal pose list [0] ::::: ", self.goal_pose_list[0][0])
+    # print("self.goal pose list [1] ::::: ", self.goal_pose_list[0][1])
+    # pose_difference = [
+    #   self.goal_pose_list[0][1][0] - self.goal_pose_list[0][0][0], # X difference
+    #   self.goal_pose_list[0][1][1] - self.goal_pose_list[0][0][1], # Y difference
+    #   self.goal_pose_list[0][1][2] - self.goal_pose_list[0][0][2]  # Z difference
+    # ]
+    # print("self.goal pose list [1-0] ::::: ", pose_difference)
+
+  def set_pose_goals_list(self, pose_goal_positions):
+    self.goal_pose_list.append(pose_goal_positions)
+
+    print ("Self Goal Pose List: ", self.goal_pose_list)
 
 
 #-------------------  Movement threading
@@ -220,71 +304,79 @@ class UR3_Movement(object):
     joint_deg = [20, -100, -125, -26, -280, 20]
     joint_goal = np.deg2rad(joint_deg)
 
+    # self.goal_pose_list.append(joint_goal)
     self.start_movement(joint_goal)
 
 
-  def set_pose(self):
-    angle_rad = math.radians(10)
-
-    pose_goal = geometry_msgs.msg.Pose() 
-    pose_goal.orientation.x = 0.0 
-    pose_goal.orientation.y = math.cos(angle_rad)
-    pose_goal.orientation.z = 0.0
-    pose_goal.orientation.w = math.sin(angle_rad)
-    pose_goal.position.x = 0.35
-    pose_goal.position.y = 0.1
-    pose_goal.position.z = 0.12
-
-    self.pause_flag.clear()
-    self.start_movement(pose_goal)
-
-
-  def start_movement(self,target_pose):
+  def start_movement(self, target_pose): # THIS FUNCTION IS USED FOR STARTING THE THREAD TO ROBOT GO TO PRESET GOAL
     self.target_pose = target_pose
-    self.move_thread = threading.Thread(target=self._move_to_target)
+    self.move_thread = threading.Thread(target=self._move_to_target) # Start and Stop this thread to run the robot
     self.move_thread.start()
 
-  def stop_movement(self):
+  def stop_movement(self): # Stop the robot and stop the thread (join)
     self.stop_flag.set()
-    if self.move_thread:
-        self.move_thread.join()
-        self.move_group.stop()
-
-  def pause_movement(self):
-    self.pause_flag.set()
     if self.move_thread:
         self.move_thread.join()
         self.move_group.stop()
 
   def release_stop_event(self):
     # Reset the stop flag after homing
+    print("\n----------Clear Stop Flag----------\n")
     self.stop_flag.clear()
-    self.pause_flag.clear()
 
-  def _move_to_target(self):
+  def _check_goal_reached(self):
+    rate = rospy.Rate(10)
+    while True:
+      # ---------------------------- CHECK IF THE GOAL IS REACHED -> USING SELF.TARGET_POSE
+      if np.all(self.target_pose):
+        # ----- Check if the current pose and the target pose is equal
+        current_joints = self.move_group.get_current_joint_values()
+        if all_close(self.target_pose, current_joints, 0.01):
+          self.completeGoal_flag.set()
+          print("\n----------------\nGoal Joint is reached !!!\n------------------\n")
+          self.target_pose = None
+
+      elif isinstance(self.target_pose, geometry_msgs.msg.Pose):
+        current_pose = self.move_group.get_current_pose().pose
+        if all_close(self.target_pose, current_pose, 0.01):
+          self.completeGoal_flag.set()
+          print("\n----------------\nGoal Pose is reached !!!\n------------------\n")
+          self.target_pose = None
+
+      rate.sleep()
+
+  def _move_to_target(self):  ## FIX PLAN CARTERSIAN AND EXECUTE PLAN INSTEAD OF STATIC JOINT ANGLES
     rate = rospy.Rate(10)  # Adjust the rate based on your requirements
-    move_group = self.move_group
-    while not self.stop_flag.is_set() and not self.pause_flag.is_set():
-      if type(self.target_pose) is geometry_msgs.msg.Pose: # Moving with Pose
-        if self.target_pose:
-          move_group.set_pose_target(self.target_pose)
-          plan = move_group.go(wait=False)  # Set wait=False to execute asynchronously
+    print ("Go into move to target thread \n")
+    target_pose = self.target_pose
+    self.completeGoal_flag.clear() # Always clear Complete Goal Flag before moving to goal
 
-          # Check if the movement plan was successfully executed
-          if plan:
-            move_group.stop()  # Stop any ongoing movement
-            self.target_pose = None  # Reset target pose after movement
+    while not self.stop_flag.is_set():
 
-      else: # Moving with Joint angles
-        if np.all(self.target_pose):
-          move_group.set_joint_value_target(self.target_pose)
-          plan = move_group.go(wait=False) 
+      # ---------------------------- SET PLAN THE TARGET POSE COPY ONLY ONCE
+      if np.all(target_pose): # ---- Joint angles
+        print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
+        # ----- Move to joint target
+        self.move_group.set_joint_value_target(target_pose)
+        plan = self.move_group.go(wait=False)
+        if plan:
+          self.move_group.stop()  # Stop any ongoing movement
+          target_pose = None  # Reset target pose after movement
 
-          if plan:
-            move_group.stop()
-            self.target_pose = None
+      elif isinstance(target_pose, geometry_msgs.msg.Pose): # ----- Pose target
+        print("\n--------------------------\nRobot is running... !!!\n--------------------------")
+        # ----- Move to pose target
+        self.move_group.set_pose_target(target_pose)
+        plan = self.move_group.go(wait=False)
+        if plan:
+          self.move_group.stop()
+          target_pose = None
 
-      rate.sleep()  # Ensure that the loop runs at a specific rate
+      rate.sleep()  # Ensure that the loop runs at a specific rate INSIDE THE LOOP WHILE
+
+    print("\n--------------------------\nRobot Stops !!!\n--------------------------")
+
+ 
 
 
 #------------------- Update TCP threading
@@ -293,6 +385,7 @@ class UR3_Movement(object):
     self.update_tcp_thread.start()
 
   def get_tcp(self):
+
     return self.tcp_pose_x, self.tcp_pose_y, self.tcp_pose_z, self.tcp_ori_x, self.tcp_ori_y, self.tcp_ori_z
 
   def _get_robot_tcp(self):
@@ -312,39 +405,3 @@ class UR3_Movement(object):
       rate.sleep()
 
 
-
-
-
-
-# def main():
-#   try:
-#     print("")
-#     print("----------------------------------------------------------")
-#     print("MoveIt GCode Control UR3 Robot")
-#     print("----------------------------------------------------------")
-#     print("Press Ctrl-D to exit at any time")
-#     print("")
-#     # input()
-#     ur3_movement = UR3_Movement()
-
-#     ur3_movement.init_joint_state()
-
-
-
-#     # ur3_movement.init_pose()
-    
-#     # ur3_movement.gcode_to_pose_goal()
-#     # while (True):
-#         # ur3_movement.list_pose_goal()
-#         # ur3_movement.gcode_to_pose_goal()
-#         # continue
-#     print("===== Python tutorial demo complete! =====")
-
-
-#   except rospy.ROSInterruptException:
-#     return
-#   except KeyboardInterrupt:
-#     return
-
-# if __name__ == '__main__':
-#   main()

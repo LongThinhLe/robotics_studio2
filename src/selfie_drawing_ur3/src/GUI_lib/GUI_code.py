@@ -57,6 +57,10 @@ class SelfieDrawingApp:
         self.ry_tcp = 0
         self.rz_tcp = 0
 
+        # Define desired X and Y coordinate of a picture's center
+        self.desire_x_pos = 0
+        self.desire_y_pos = 0
+
         # Initialize Image Processor
         self.image_processor = ImageProcessor()
 
@@ -211,7 +215,7 @@ class SelfieDrawingApp:
         # self.btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)
         self.btn_capture = tk.Button(button_frame, text="Take Picture", width=15, height= 5)
         btn_process_img = tk.Button(button_frame, text="Process Image", command=lambda: self.process_img(), width=15, height= 5)
-        btn_generate_gcode = tk.Button(button_frame, text="Generate Gcode", command=self.generate_gcode, width=15, height= 5)
+        btn_generate_gcode = tk.Button(button_frame, text="Generate Gcode", command=lambda: self.generate_gcode(), width=15, height= 5)
 
         self.btn_capture.grid(row=1, column=0, padx=10, pady=10, sticky='ew')  
         btn_process_img.grid(row=2, column=0, padx=10, pady=10, sticky='ew')  
@@ -349,12 +353,15 @@ class SelfieDrawingApp:
         set_button_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
 
         # Create a button for "Init"
-        homing_button = tk.Button(set_button_frame, text="Homing", font=("Arial", 16), width= 24, command= lambda: self.homing_ur3())
+        homing_button = tk.Button(set_button_frame, text="Homing", font=("Arial", 16), width= 15, command= lambda: self.homing_ur3())
         homing_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Set Zero Position" / "Set Origin"
-        set_origin_button = tk.Button(set_button_frame, text= "Set Origin", font=("Arial", 16), width= 24, command= lambda: self.set_origin_ur3())
-        set_origin_button.pack(side=tk.LEFT, padx=10)
+        set_origin_button = tk.Button(set_button_frame, text= "Set Origin", font=("Arial", 16), width= 15, command= lambda: self.set_origin_ur3())
+        set_origin_button.pack(side=tk.LEFT, padx=5)
+
+        import_file_gcode_button = tk.Button(set_button_frame, text= "Import Gcode", font=("Arial", 16), width= 15, command= lambda: self.import_gcode())
+        import_file_gcode_button.pack(side=tk.LEFT, padx=5)
 
         #--------------------------------------------- Draw Buttons
         # Create a frame for drawing buttons
@@ -364,10 +371,6 @@ class SelfieDrawingApp:
         # Create a button for "Draw!"
         draw_button = tk.Button(additional_buttons_frame, text="Draw!", font=("Arial", 16), command= lambda: self.start_drawing())
         draw_button.pack(side=tk.LEFT, padx=10)
-
-        # Create a button for "Pause"
-        pause_button = tk.Button(additional_buttons_frame, text="Pause", font=("Arial", 16), command= lambda: self.pause_drawing())
-        pause_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button for "Stop"
         stop_button = tk.Button(additional_buttons_frame, text="Stop", font=("Arial", 16), command=lambda: self.stop_drawing())
@@ -482,11 +485,34 @@ class SelfieDrawingApp:
         # Homing robot with specific joint state
         self.ur3_operate.homing_ur3()
 
+    def set_origin_ur3(self):
+        tcp_pose_x,tcp_pose_y,tcp_pose_z,tcp_ori_x,tcp_ori_y,tcp_ori_z = self.ur3_operate.get_tcp()
+        self.desire_x_pos = tcp_pose_x
+        self.desire_y_pos = tcp_pose_y
+        print("\nSet Desired X,Y pos: [",self.desire_x_pos, ", ", self.desire_y_pos, "]")
+
+    def import_gcode(self):
+        gcode_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw.gcode")
+        self.offset_gcode(gcode_path, self.desire_x_pos, self.desire_y_pos)
+
+        pose_goal_positions = self.gcode2pose()
+        self.ur3_operate.set_pose_goals_list(pose_goal_positions)      
+
+
     def start_drawing(self):
-        self.ur3_operate.set_pose()
-    
-    def pause_drawing(self):
-        self.ur3_operate.pause_movement()
+
+        # self.ur3_operate.start_movement()
+
+        self.ur3_operate.test_drawing_cartesian_path()
+        # gcode_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw.gcode")
+        # new_gcode_path = self.offset_gcode(gcode_path, self.desire_x_pos, self.desire_y_pos)
+
+        # pose_goal_positions = self.gcode2pose()
+        # self.ur3_operate.set_pose_goals_list(pose_goal_positions)
+
+        # Testing Cannot use anymore
+        # self.ur3_operate.set_pose()
+        
 
     def stop_drawing(self):
         self.ur3_operate.stop_movement()
@@ -497,6 +523,29 @@ class SelfieDrawingApp:
     def print_ur3_pose(self):
         print("\nCurrent pose:", self.ur3_operate.move_group.get_current_pose().pose)
 
+    def gcode2pose(self):
+        # Read the Gcode file and extract the pose goal positions
+        gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
+        
+        pose_goal_positions = []
+
+        with open (gcode_file_path, 'r') as file:
+            for line in file:
+                if line.startswith('G0'):
+                    # Extract X,Y coordinates from the gcode file
+                    x = float(line.split('X')[1].split(' ')[0])
+                    y = float(line.split('Y')[1].split(' ')[0])
+                    z = 0.105
+                    pose_goal_positions.append([x,y,z])
+
+                elif line.startswith('G1'):
+                    # Extract X,Y coordinates from the gcode file
+                    x = float(line.split('X')[1].split(' ')[0])
+                    y = float(line.split('Y')[1].split(' ')[0])
+                    z = 0.08
+                    pose_goal_positions.append([x,y,z])
+
+        return pose_goal_positions
 
     #------------------- Update TCP of UR3 Threading
     def init_update_tcp_thread(self):
@@ -507,7 +556,10 @@ class SelfieDrawingApp:
         rate = rospy.Rate(10)
         
         while True:
-            tcp_pose_x, tcp_pose_y, tcp_pose_z, tcp_ori_x, tcp_ori_y, tcp_ori_z = self.ur3_operate.get_tcp()
+            try:
+                tcp_pose_x, tcp_pose_y, tcp_pose_z, tcp_ori_x, tcp_ori_y, tcp_ori_z = self.ur3_operate.get_tcp()
+            except:
+                pass
 
             self.x_tcp = tcp_pose_x
             self.y_tcp = tcp_pose_y
@@ -525,12 +577,6 @@ class SelfieDrawingApp:
             self.lbl_rz.config(text="Rz:{:.2f} rad".format(self.z_ori))
             rate.sleep()
         
-
-
-
-
-
-
 
     #-------------------- Threading for Timer
 
@@ -610,7 +656,6 @@ class SelfieDrawingApp:
         if not os.path.exists(svg_path):
             print("SVG file not found.")
             return
-        
 
         # Load SVG file
         paths, _ = svg.svg2paths(svg_path)
@@ -626,7 +671,7 @@ class SelfieDrawingApp:
         displacement_y = desired_center_y - svg_center_y
 
         # Scale factor (adjust as needed)
-        scale = 0.05  # Experiment with this value
+        scale = 0.001  # Experiment with this value
 
         save_folder_gcode = os.path.join(self.home_directory, "rs2_ws", "gcode")
         
@@ -678,6 +723,35 @@ class SelfieDrawingApp:
         center_y = (min_y + max_y) / 2
         return center_x, center_y
     
+    def offset_gcode(self, gcode_path, offset_x, offset_y):
+
+        new_gcode_path = os.path.splitext(gcode_path)[0] + "_offset.gcode"
+        with open(gcode_path, 'r') as file:
+            with open(new_gcode_path, 'w') as new_file:
+                for line in file:
+                    if line.startswith('G0') or line.startswith('G1'):
+                        # Extract X and Y coordinates
+                        parts = line.split()
+                        x_coord = None
+                        y_coord = None
+                        for part in parts:
+                            if part.startswith('X'):
+                                x_coord = float(part[1:])
+                            elif part.startswith('Y'):
+                                y_coord = float(part[1:])
+                        if x_coord is not None and y_coord is not None:
+                            # Apply offset
+                            x_coord += offset_x
+                            y_coord += offset_y
+                            # Write modified line to new file
+                            new_line = f"{parts[0]} X{x_coord:.2f} Y{y_coord:.2f}\n"
+                            new_file.write(new_line)
+                    else:
+                        # Write non-coordinate lines unchanged
+                        new_file.write(line)
+
+        # return new_gcode_path
+
 
 def main():
     root = tk.Tk()
