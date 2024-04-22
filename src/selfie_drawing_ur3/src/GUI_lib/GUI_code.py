@@ -211,6 +211,10 @@ class SelfieDrawingApp:
         lbl_function_buttons = tk.Label(button_frame, text="Function Buttons", font=("Arial", 20, "bold"))
         lbl_function_buttons.grid(row=0, column=0, pady=5)
 
+        # Create a label for the countdown display
+        self.lbl_countdown_display = tk.Label(countdown_frame, text="Countdown: 0s", font=("Arial", 16))
+        self.lbl_countdown_display.grid(row=4, column=0, columnspan=4, pady=5)
+        
         # Create the buttons for taking a picture and resetting
         # self.btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)
         self.btn_capture = tk.Button(button_frame, text="Take Picture", width=15, height= 5)
@@ -595,8 +599,9 @@ class SelfieDrawingApp:
         self.running = False
 
     def _run_timer(self):
-        count = self.duration
+        count = self.countdown_value
         while count >= 0 and self.running:
+            self.lbl_countdown_display.config(text=f"Countdown: {count}s")  # Update countdown display
             print(f"Countdown now: {count}")
             time.sleep(1)  # Sleep for 1 second
             count -= 1
@@ -609,6 +614,16 @@ class SelfieDrawingApp:
     def set_countdown(self,seconds):
         self.countdown_value = seconds
 
+    # Create a method to update the countdown label
+    def update_countdown_display(self):
+        self.lbl_countdown_display.config(text=f"Countdown: {self.countdown_value}s")
+
+    # Update the countdown display based on the selected countdown duration
+    def set_countdown(self, value):
+        self.countdown_value = value
+        self.update_countdown_display()
+
+    
     #-------------------- Buttons for Image Processing
     def button_pressed(self, event):
         event.widget.config(highlightthickness=1)
