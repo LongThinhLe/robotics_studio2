@@ -384,6 +384,10 @@ class SelfieDrawingApp:
         print_pose_button = tk.Button(additional_buttons_frame, text="Print Pose", font=("Arial", 16), command= lambda: self.print_ur3_pose())
         print_pose_button.pack(side=tk.LEFT, padx=10)
 
+        # Create a button for "Clear Goal"
+        clear_goals_button = tk.Button(additional_buttons_frame, text= "Clear Goals", font=("Arial", 16), command= lambda: self.clear_all_goals())
+        clear_goals_button.pack(side= tk.LEFT, padx=10)
+
 
 
     #-------------------- Buttons for Robot
@@ -523,6 +527,10 @@ class SelfieDrawingApp:
     def print_ur3_pose(self):
         print("\nCurrent pose:", self.ur3_operate.move_group.get_current_pose().pose)
 
+    def clear_all_goals(self):
+        self.ur3_operate.goal_pose_list.clear()
+
+
     def gcode2pose(self):
         # Read the Gcode file and extract the pose goal positions
         gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
@@ -535,14 +543,14 @@ class SelfieDrawingApp:
                     # Extract X,Y coordinates from the gcode file
                     x = float(line.split('X')[1].split(' ')[0])
                     y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.105
+                    z = 0.16
                     pose_goal_positions.append([x,y,z])
 
                 elif line.startswith('G1'):
                     # Extract X,Y coordinates from the gcode file
                     x = float(line.split('X')[1].split(' ')[0])
                     y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.08
+                    z = 0.105
                     pose_goal_positions.append([x,y,z])
 
         return pose_goal_positions
@@ -671,7 +679,7 @@ class SelfieDrawingApp:
         displacement_y = desired_center_y - svg_center_y
 
         # Scale factor (adjust as needed)
-        scale = 0.001  # Experiment with this value
+        scale = 0.0005  # Experiment with this value
 
         save_folder_gcode = os.path.join(self.home_directory, "rs2_ws", "gcode")
         
@@ -699,8 +707,8 @@ class SelfieDrawingApp:
 
                     # Write G-code commands
                     if i == 0:
-                        f.write(f"G0 X{start_x:.2f} Y{start_y:.2f}\n")  # Rapid move to start point
-                    f.write(f"G1 X{end_x:.2f} Y{end_y:.2f}\n")  # Linear move to end point
+                        f.write(f"G0 X{start_x:.10f} Y{start_y:.10f}\n")  # Rapid move to start point
+                    f.write(f"G1 X{end_x:.10f} Y{end_y:.10f}\n")  # Linear move to end point
 
 
         print("Generate Gcode Done!")
@@ -744,7 +752,7 @@ class SelfieDrawingApp:
                             x_coord += offset_x
                             y_coord += offset_y
                             # Write modified line to new file
-                            new_line = f"{parts[0]} X{x_coord:.2f} Y{y_coord:.2f}\n"
+                            new_line = f"{parts[0]} X{x_coord:.6f} Y{y_coord:.6f}\n"
                             new_file.write(new_line)
                     else:
                         # Write non-coordinate lines unchanged

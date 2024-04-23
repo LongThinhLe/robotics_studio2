@@ -159,58 +159,97 @@ class UR3_Movement(object):
 #------------------- Draw from Gcode file
 
   def test_drawing_cartesian_path(self,scale = 1):
-    waypoints = []
+    # waypoints = []
 
-    wpose = self.move_group.get_current_pose().pose
+    # wpose = self.move_group.get_current_pose().pose
+    # list_length = len(self.goal_pose_list[0])
 
-    list_length = len(self.goal_pose_list[0])
-    for i in range (min(10, list_length)):
-      wpose.position.z = scale * self.goal_pose_list[0][i][2]
-      waypoints.append(copy.deepcopy(wpose))
 
-      wpose.position.x = scale * self.goal_pose_list[0][i][0]
-      wpose.position.y = scale * self.goal_pose_list[0][i][1]
-      waypoints.append(copy.deepcopy(wpose))
+    # for i in range (min(10, list_length)):
+    #   wpose.position.z = scale * self.goal_pose_list[0][i][2]
+    #   waypoints.append(copy.deepcopy(wpose))
 
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints, 0.005, 0.0)
-    self.move_group.execute(plan, wait = False)
+    #   wpose.position.x = scale * self.goal_pose_list[0][i][0]
+    #   wpose.position.y = scale * self.goal_pose_list[0][i][1]
+    #   waypoints.append(copy.deepcopy(wpose))
+
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints, 0.005, 0.0)
+    # self.move_group.execute(plan, wait = False)
 
     # Still use minus offset !!!
 
 
 
 
-    # waypoints = []
+    waypoints = []
 
-    # current_pose = self.move_group.get_current_pose().pose
-    # current_x = current_pose.position.x
-    # current_y = current_pose.position.y
-    # current_z = current_pose.position.z
+    current_pose = self.move_group.get_current_pose().pose
+    current_x = current_pose.position.x
+    current_y = current_pose.position.y
+    current_z = current_pose.position.z
 
     # print ("Current Z = ", current_z)
     # print ("Next Z = ", self.goal_pose_list[0][0][2])
 
-    # offset_x = self.goal_pose_list[0][0][0] - current_x
-    # offset_y = self.goal_pose_list[0][0][1] - current_y
-    # offset_z = self.goal_pose_list[0][0][2] - current_z
+    offset_x = self.goal_pose_list[0][0][0] - current_x
+    offset_y = self.goal_pose_list[0][0][1] - current_y
+    offset_z = self.goal_pose_list[0][0][2] - current_z
 
     # print ("Offset z = ", offset_z)
 
 
-    # wpose = copy.deepcopy(current_pose)
-    # # Update z position
-    # wpose.position.z = scale * offset_z
-    # waypoints.append(copy.deepcopy(wpose))
+    wpose = copy.deepcopy(current_pose)
+    # Update z position
+    wpose.position.z += scale * offset_z
+    waypoints.append(copy.deepcopy(wpose))
 
-    # wpose.position.x = scale * offset_x
-    # wpose.position.y = scale * offset_y
-    # waypoints.append(copy.deepcopy(wpose))
+    wpose.position.x += scale * offset_x
+    wpose.position.y += scale * offset_y
+    waypoints.append(copy.deepcopy(wpose))
 
-    # print ("Waypoint position z = ", wpose.position.z)
+    # print ("Waypoint position z = \n", waypoints)
 
-    # list_length = len(self.goal_pose_list[0]) 
-    # for i in range (min(10, list_length)):
-    #   for j in range(3):
+
+    #---------------------------------------- Convert Gcode to waypoint is wrong !!!!
+    list_length = len(self.goal_pose_list[0]) 
+    # for i in range (min(50, list_length)):
+    for i in range (list_length-1):
+        current_x = self.goal_pose_list[0][i][0]
+        current_y = self.goal_pose_list[0][i][1]
+        current_z = self.goal_pose_list[0][i][2]
+
+        next_x = self.goal_pose_list[0][i+1][0]
+        next_y = self.goal_pose_list[0][i+1][1]
+        next_z = self.goal_pose_list[0][i+1][2]
+
+        # Testing:
+        offset_x = current_x
+        offset_y = current_y
+
+
+        # offset_x = next_x - current_x
+        # offset_y = next_y - current_y
+        offset_z = next_z - current_z
+
+        print ("\n\nOffset x = ", offset_x)
+        print ("Offset y = ", offset_y)
+        print ("Offset z = ", offset_z)
+
+        if offset_z > 0 or offset_z < 0:
+          wpose.position.z += scale * offset_z
+          waypoints.append(copy.deepcopy(wpose))
+
+        wpose.position.x = scale * offset_x
+        wpose.position.y = scale * offset_y
+        waypoints.append(copy.deepcopy(wpose))
+
+    # print ("Waypoint position z = \n", waypoints)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints, 0.005, 0.0)
+    self.move_group.execute(plan, wait = False)
+
+    #---------------------------------------- Convert Gcode to waypoint is wrong !!!!
+
+        
         
 
 
