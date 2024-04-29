@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 import tkinter as tk
-from tkinter import ttk, Scale
+from tkinter import ttk, filedialog
 from tkinter.ttk import *
 
-from PIL import Image, ImageTk
+from PIL import Image
 import os
 from rembg import remove
 from PIL import Image
@@ -29,7 +29,11 @@ class SelfieDrawingApp:
         super().__init__()
         self.process = None
         self.master = master
-        
+
+        # Initialize node for GUI updating
+        rospy.init_node('selfie_drawing_ur3', anonymous= True)
+
+        # GUI information
         master.title("Automated Artistic Portraiture")
         master.resizable(False, False)
         master.size
@@ -73,7 +77,10 @@ class SelfieDrawingApp:
         # Initialize Icon for application
         self.init_icon()
 
-
+        # Update GUI status
+        
+        self.update_GUI_status = threading.Thread(target= self._update_GUI_status)
+        self.update_GUI_status.start()
 
     #-------------------- Init Icon App
     def init_icon(self):
@@ -211,6 +218,10 @@ class SelfieDrawingApp:
         lbl_function_buttons = tk.Label(button_frame, text="Function Buttons", font=("Arial", 20, "bold"))
         lbl_function_buttons.grid(row=0, column=0, pady=5)
 
+        # Create a label for the countdown display
+        self.lbl_countdown_display = tk.Label(countdown_frame, text="Countdown: 0s", font=("Arial", 16))
+        self.lbl_countdown_display.grid(row=4, column=0, columnspan=4, pady=5)
+
         # Create the buttons for taking a picture and resetting
         # self.btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)
         self.btn_capture = tk.Button(button_frame, text="Take Picture", width=15, height= 5)
@@ -231,7 +242,6 @@ class SelfieDrawingApp:
 
         # Start the webcam preview
         self.update_preview()
-
 
     #-------------------- Init 2nd tab
     def init_robot_draw_tab(self):
@@ -276,12 +286,8 @@ class SelfieDrawingApp:
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
         # Create a button to connect
-        connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
-        connect_button.pack(side=tk.LEFT)
-
-        # Create a button to disconnect
-        disconnect_button = tk.Button(ip_frame, text="Disconnect", font=("Arial", 16), command= lambda: self.disconnect_from_robot())
-        disconnect_button.pack(side=tk.LEFT, padx=10)
+        self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
+        self.connect_button.pack(side=tk.LEFT)
 
 
         #-------------------------------------------- TCP display
@@ -314,20 +320,49 @@ class SelfieDrawingApp:
         self.lbl_rz.grid(row=2, column=1, padx=5)
 
 
+        # ------------------------------------------ File Selection
+        open_file_frame = tk.Frame(self.tab_robot_draw, relief=tk.SOLID)
+        open_file_frame.grid(row=1, column=2, rowspan=2, padx=10, pady=60, ipadx=5, ipady=5, sticky="w")
+
+        open_file_button = tk.Button(open_file_frame, text="Open Gcode file", font=("Arial", 20), command= lambda: self.open_file_dialog())
+        open_file_button.pack()
+
+        #------------------------------------------- Connection Selection
+        # Create a frame for connection selection
+        connection_frame = tk.Frame(self.tab_robot_draw)
+        connection_frame.grid(row=1, column=0, columnspan=1, sticky="w", padx= 10)
+
+        # Create a label for connection selection
+        lbl_connection = tk.Label(connection_frame, text="Connection Type:", font=("Arial", 20))
+        lbl_connection.grid(row=0, column=0, sticky="w")
+
+        # Variable to hold the selected connection type
+        self.connection_type = tk.StringVar()
+
+        # Set default connection type to "Real"
+        self.connection_type.set("real")
+
+        # Create radio buttons for real and simulation connections
+        real_radio = tk.Radiobutton(connection_frame, text="Real", font=("Arial", 16), variable=self.connection_type, value="real")
+        real_radio.grid(row=0, column=1, padx=10)
+
+        simulation_radio = tk.Radiobutton(connection_frame, text="Simulation", font=("Arial", 16), variable=self.connection_type, value="simulation")
+        simulation_radio.grid(row=0, column=2, padx=10)
+
         #------------------------------------------- Terminate button
         terminate_frame = tk.Frame(self.tab_robot_draw)
-        terminate_frame.grid(row=1, column=0, columnspan=1, sticky="w", pady= 10)
+        terminate_frame.grid(row=2, column=0, columnspan=1, sticky="w", pady= 10)
         terminate_button = tk.Button(terminate_frame,text="Terminate All", font=("Arial", 16), command= lambda: self.terminate_process(), width=52)
         terminate_button.pack(side=tk.LEFT, padx=10)
 
         #------------------------------------------- Launch Simulation and Initialize Robot
         # Create a frame for the buttons
         buttons_frame = tk.Frame(self.tab_robot_draw)
-        buttons_frame.grid(row=2, column=0, columnspan=1, sticky="w")
+        buttons_frame.grid(row=3, column=0, columnspan=1, sticky="w")
 
         # Create a button to launch UR3 Gazebo
-        launch_gazebo_button = tk.Button(buttons_frame, text="Launch Gazebo", font=("Arial", 16), command= lambda: self.launch_gazebo())
-        launch_gazebo_button.pack(side=tk.LEFT, padx=10)
+        self.launch_gazebo_button = tk.Button(buttons_frame, text="Launch Gazebo", font=("Arial", 16), command= lambda: self.launch_gazebo())
+        self.launch_gazebo_button.pack(side=tk.LEFT, padx=10)
 
         # Create a button to launch MoveIt Planning
         launch_moveit_planning_button = tk.Button(buttons_frame, text="Launch MoveIt Planning", font=("Arial", 16), command= lambda: self.launch_moveit_planning())
@@ -340,7 +375,7 @@ class SelfieDrawingApp:
 
         # Create a frame for Robot initialize
         initRobot_buttons_frame = tk.Frame(self.tab_robot_draw)
-        initRobot_buttons_frame.grid(row=3, column=0, columnspan=1, sticky="w", pady= 10)
+        initRobot_buttons_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
 
         # Create a button for "Init"
         initRobot_button = tk.Button(initRobot_buttons_frame, text="Initialize Robot UR3", font=("Arial", 16), width= 52, command= lambda: self.init_robot_ur3())
@@ -350,7 +385,7 @@ class SelfieDrawingApp:
         #--------------------------------------------- Homing
         # Create a frame for Robot Homing
         set_button_frame = tk.Frame(self.tab_robot_draw)
-        set_button_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
+        set_button_frame.grid(row=5, column=0, columnspan=1, sticky="w", pady= 10)
 
         # Create a button for "Init"
         homing_button = tk.Button(set_button_frame, text="Homing", font=("Arial", 16), width= 15, command= lambda: self.homing_ur3())
@@ -366,7 +401,7 @@ class SelfieDrawingApp:
         #--------------------------------------------- Draw Buttons
         # Create a frame for drawing buttons
         additional_buttons_frame = tk.Frame(self.tab_robot_draw)
-        additional_buttons_frame.grid(row=5, column=0, columnspan=1, sticky="w")
+        additional_buttons_frame.grid(row=6, column=0, columnspan=1, sticky="w")
 
         # Create a button for "Draw!"
         draw_button = tk.Button(additional_buttons_frame, text="Draw!", font=("Arial", 16), command= lambda: self.start_drawing())
@@ -389,6 +424,59 @@ class SelfieDrawingApp:
         clear_goals_button.pack(side= tk.LEFT, padx=10)
 
 
+        #------------------------------------------------ Button Changing Pen
+        # Create a frame for Changing Pen
+        changing_pen_frame = tk.Frame(self.tab_robot_draw)
+        changing_pen_frame.grid(row= 7, column=0, columnspan=1, sticky= "w", pady= 10)
+
+        # Create a button for Changing pen left / right
+        left_pen = tk.Button(changing_pen_frame, text="Left Pen", font=("Arial", 16), command= lambda: self.change2leftpen())
+        left_pen.pack(side=tk.LEFT, padx= 10)
+
+        right_pen = tk.Button(changing_pen_frame, text= "Right Pen", font=("Arial", 16), command= lambda: self.change2rightpen())
+        right_pen.pack(side=tk.LEFT, padx= 10)
+
+        pen_1 = tk.Button(changing_pen_frame, text="Pen 1", font=("Arial", 16), command= lambda: self.selectPen1())
+        pen_1.pack(side=tk.LEFT, padx= 10)
+
+        pen_2 = tk.Button(changing_pen_frame, text="Pen 2", font=("Arial", 16), command= lambda: self.selectPen2())
+        pen_2.pack(side=tk.LEFT, padx= 10)
+
+        pen_3 = tk.Button(changing_pen_frame, text="Pen 3", font=("Arial", 16), command= lambda: self.selectPen3())
+        pen_3.pack(side=tk.LEFT, padx= 10)
+
+
+
+    #-------------------- Button for Changing Pen
+    def change2leftpen(self):
+        self.ur3_operate.change2leftpen()
+
+
+
+    def change2rightpen(self):
+        self.ur3_operate.change2rightpen()
+
+
+    def selectPen1(self):
+        self.ur3_operate.change2Pen1()
+
+    def selectPen2(self):
+        self.ur3_operate.change2Pen2()
+
+    def selectPen3(self):
+        self.ur3_operate.change2Pen3()
+
+
+
+    #-------------------- Button for File selection
+    def open_file_dialog(self):
+        relative_path = "rs2_ws/gcode"
+        initial_directory = os.path.join(self.home_directory, relative_path)
+        self.gcode_path = filedialog.askopenfilename(title="Select Gcode file", initialdir= initial_directory, filetypes=[("Gcode files", "*.gcode")])
+        if self.gcode_path:
+            print("Selected Gcode file:", self.gcode_path)
+        else:
+            print("No file selected.")
 
     #-------------------- Buttons for Robot
     def connect_to_robot(self):
@@ -400,12 +488,6 @@ class SelfieDrawingApp:
 
         # Execute the command
         self.process = subprocess.Popen(command)
-
-    def disconnect_from_robot(self):
-        # # Terminate the process if it exists
-        # if hasattr(self, 'process') and self.process:
-        #     self.process.terminate()
-        pass
 
     def terminate_process(self):
         # Terminate the process if it exists
@@ -459,11 +541,8 @@ class SelfieDrawingApp:
         self.process = subprocess.Popen(command) 
     
     def launch_moveit_planning(self):
-        # Construct the command to execute SIMULATION ONLY
-        command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
-        
-        # Construct the command to execute REAL ROBOT ONLY
-        # command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
+        if self.connection_type.get() == "real": command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
+        else: command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
         
         # Execute the command
         self.process = subprocess.Popen(command) 
@@ -480,11 +559,10 @@ class SelfieDrawingApp:
 
         # Start get thread Robot TCP
         self.ur3_operate.update_robot_tcp_thread()
-
+        time.sleep(0.2)
         # Start update thread Robot TCP
         self.init_update_tcp_thread()
     
-
     def homing_ur3(self):
         # Homing robot with specific joint state
         self.ur3_operate.homing_ur3()
@@ -495,28 +573,22 @@ class SelfieDrawingApp:
         self.desire_y_pos = tcp_pose_y
         print("\nSet Desired X,Y pos: [",self.desire_x_pos, ", ", self.desire_y_pos, "]")
 
+        self.ur3_operate.set_origin_pose()
+        print ("\nSet origin pose")
+ 
     def import_gcode(self):
-        gcode_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw.gcode")
-        self.offset_gcode(gcode_path, self.desire_x_pos, self.desire_y_pos)
-
-        pose_goal_positions = self.gcode2pose()
-        self.ur3_operate.set_pose_goals_list(pose_goal_positions)      
-
+        if self.gcode_path:
+            # Perform import operations using the selected Gcode file path
+            print("Open Gcode file at: ", self.gcode_path)
+            offset_gcode_path = self.offset_gcode(self.gcode_path, self.desire_x_pos, self.desire_y_pos)
+            pose_goal_positions = self.gcode2pose(offset_gcode_path)
+            self.ur3_operate.set_pose_goals_list(pose_goal_positions)
+        else:
+            print("No Gcode file selected.")
+    
 
     def start_drawing(self):
-
-        # self.ur3_operate.start_movement()
-
-        self.ur3_operate.test_drawing_cartesian_path()
-        # gcode_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw.gcode")
-        # new_gcode_path = self.offset_gcode(gcode_path, self.desire_x_pos, self.desire_y_pos)
-
-        # pose_goal_positions = self.gcode2pose()
-        # self.ur3_operate.set_pose_goals_list(pose_goal_positions)
-
-        # Testing Cannot use anymore
-        # self.ur3_operate.set_pose()
-        
+        self.ur3_operate.start_drawing()
 
     def stop_drawing(self):
         self.ur3_operate.stop_movement()
@@ -526,15 +598,19 @@ class SelfieDrawingApp:
 
     def print_ur3_pose(self):
         print("\nCurrent pose:", self.ur3_operate.move_group.get_current_pose().pose)
+        print("\nCurrent Joint: ", self.ur3_operate.move_group.get_current_joint_values())
 
     def clear_all_goals(self):
-        self.ur3_operate.goal_pose_list.clear()
+        print("\n----------------\nAll Goals are clear !!!\n------------------\n")
+        self.ur3_operate.clear_all_goals()
 
 
-    def gcode2pose(self):
+
+
+    def gcode2pose(self, new_gcode_path):
         # Read the Gcode file and extract the pose goal positions
-        gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
-        
+        # gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
+        gcode_file_path = new_gcode_path
         pose_goal_positions = []
 
         with open (gcode_file_path, 'r') as file:
@@ -550,7 +626,7 @@ class SelfieDrawingApp:
                     # Extract X,Y coordinates from the gcode file
                     x = float(line.split('X')[1].split(' ')[0])
                     y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.105
+                    z = 0.125
                     pose_goal_positions.append([x,y,z])
 
         return pose_goal_positions
@@ -562,12 +638,11 @@ class SelfieDrawingApp:
 
     def _update_tcp_gui(self):
         rate = rospy.Rate(10)
-        
         while True:
             try:
                 tcp_pose_x, tcp_pose_y, tcp_pose_z, tcp_ori_x, tcp_ori_y, tcp_ori_z = self.ur3_operate.get_tcp()
             except:
-                pass
+                print("TCP not ready!")
 
             self.x_tcp = tcp_pose_x
             self.y_tcp = tcp_pose_y
@@ -584,6 +659,28 @@ class SelfieDrawingApp:
             self.lbl_ry.config(text="Ry:{:.2f} rad".format(self.y_ori))
             self.lbl_rz.config(text="Rz:{:.2f} rad".format(self.z_ori))
             rate.sleep()
+
+
+
+
+    #-------------------- Threading for Updating GUI status
+    def _update_GUI_status(self):
+        rate = rospy.Rate(10)
+        while True:
+            # Update button status based on Connection type
+            if self.connection_type.get() == "real":
+                self.launch_gazebo_button.configure(state= tk.DISABLED)
+                self.ip_entry.configure(state= tk.NORMAL)
+                self.connect_button.configure(state= tk.NORMAL)
+
+            elif self.connection_type.get() == "simulation":
+                self.launch_gazebo_button.configure(state= tk.NORMAL)
+                self.ip_entry.configure(state= tk.DISABLED)
+                self.connect_button.configure(state= tk.DISABLED)
+        
+            rate.sleep()
+
+
         
 
     #-------------------- Threading for Timer
@@ -603,9 +700,11 @@ class SelfieDrawingApp:
         self.running = False
 
     def _run_timer(self):
-        count = self.duration
+        # count = self.duration
+        count = self.countdown_value
         while count >= 0 and self.running:
             print(f"Countdown now: {count}")
+            self.lbl_countdown_display.config(text=f"Countdown: {count}s")
             time.sleep(1)  # Sleep for 1 second
             count -= 1
 
@@ -616,6 +715,11 @@ class SelfieDrawingApp:
 
     def set_countdown(self,seconds):
         self.countdown_value = seconds
+        self.update_countdown_display()
+
+    def update_countdown_display(self):
+        self.lbl_countdown_display.config(text=f"Countdown: {self.countdown_value}s")
+
 
     #-------------------- Buttons for Image Processing
     def button_pressed(self, event):
@@ -679,7 +783,7 @@ class SelfieDrawingApp:
         displacement_y = desired_center_y - svg_center_y
 
         # Scale factor (adjust as needed)
-        scale = 0.0005  # Experiment with this value
+        scale = 0.001  # Experiment with this value
 
         save_folder_gcode = os.path.join(self.home_directory, "rs2_ws", "gcode")
         
@@ -758,13 +862,13 @@ class SelfieDrawingApp:
                         # Write non-coordinate lines unchanged
                         new_file.write(line)
 
-        # return new_gcode_path
+        return new_gcode_path
 
 
-def main():
-    root = tk.Tk()
-    SelfieDrawingApp(root)
-    root.mainloop()
+# def main():
+#     root = tk.Tk()
+#     SelfieDrawingApp(root)
+#     root.mainloop()
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
