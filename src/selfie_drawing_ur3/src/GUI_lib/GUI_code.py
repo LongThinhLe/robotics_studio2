@@ -34,7 +34,7 @@ class SelfieDrawingApp:
         rospy.init_node('selfie_drawing_ur3', anonymous= True)
 
         # GUI information
-        master.title("Automated Artistic Portraiture")
+        master.title("Selfie Robot")
         master.resizable(False, False)
         master.size
 
@@ -130,7 +130,7 @@ class SelfieDrawingApp:
         preview_frame.grid(row=0, column=0, padx=10, pady=10)
         
         # Create a label for the preview screen with increased font size
-        lbl_preview = tk.Label(preview_frame, text="Live Camera", font=("Arial", 20), fg="#c71010")
+        lbl_preview = tk.Label(preview_frame, text="Live Camera", font=("Arial", 20, "bold"), fg="#c71010")
         lbl_preview.pack()
 
         # Create a canvas for the preview screen
@@ -214,7 +214,6 @@ class SelfieDrawingApp:
         self.btn_10_sec.bind("<ButtonPress-1>", self.button_pressed)
 
 
-
         # Create a frame to hold the buttons
         button_frame = tk.Frame(self.tab_take_picture)
         button_frame.grid(row=1, column=2, padx=10, pady=10, sticky='ns')  # Adjust row and column as needed
@@ -229,9 +228,9 @@ class SelfieDrawingApp:
 
         # Create the buttons for taking a picture and resetting
         # self.btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)
-        self.btn_capture = tk.Button(button_frame, text="Take Picture", width=15, height=5, relief="raised", bg="#13d12f", fg="#FFFFFF", borderwidth=3, highlightthickness=2)
-        btn_process_img = tk.Button(button_frame, text="Process Image", command=lambda: self.process_img(), bg="#0fbd29", fg="#FFFFFF", width=15, height= 5, relief="raised", borderwidth=3, highlightthickness=2)
-        btn_generate_gcode = tk.Button(button_frame, text="Generate Gcode", command=lambda: self.generate_gcode(), bg="#0e9c23", fg="#FFFFFF", width=15, height= 5, relief="raised", borderwidth=3, highlightthickness=2)
+        self.btn_capture = tk.Button(button_frame, text="1. Take Selfie", width=15, height=5, relief="raised", bg="#13d12f", fg="#FFFFFF", borderwidth=3, highlightthickness=2)
+        btn_process_img = tk.Button(button_frame, text="2. Process Image", command=lambda: self.process_img(), bg="#0fbd29", fg="#FFFFFF", width=15, height= 5, relief="raised", borderwidth=3, highlightthickness=2)
+        btn_generate_gcode = tk.Button(button_frame, text="3. Confirm", command=lambda: self.generate_gcode(), bg="#0e9c23", fg="#FFFFFF", width=15, height= 5, relief="raised", borderwidth=3, highlightthickness=2)
 
         self.btn_capture.grid(row=1, column=0, padx=10, pady=10, sticky='ew')  
         btn_process_img.grid(row=2, column=0, padx=10, pady=10, sticky='ew')  
@@ -239,7 +238,14 @@ class SelfieDrawingApp:
 
         # Bind click events to button animations
         self.btn_capture.bind("<ButtonPress-1>", self.button_pressed)
-
+        
+        # Create frame for copy-right text.
+        cr_frame = tk.Frame(self.tab_take_picture)
+        cr_frame.grid(row=10, column=2, padx=10, pady=10, sticky='ns')
+        
+        # Add copy-right text.
+        copy_right = tk.Label(cr_frame, text="Brought to you by Group 23", font=("Arial", 15))
+        copy_right.grid(row=0, column=0)
 
         #----------------------------------Initialize
         # Initialize captured photo variable
@@ -265,6 +271,18 @@ class SelfieDrawingApp:
             # Create a label for the robot name
             robot_name = tk.Label(status_frame, text="UR3 Robot Arm", font=("Arial", 20, "bold"), fg= "blue")
             robot_name.pack(side=tk.LEFT, padx=(20, 40))  # Adjust padx as needed
+            
+            # Create a frame for "Robot Status"
+            robot_status_frame = tk.Frame(status_frame)
+            robot_status_frame.pack(side=tk.LEFT)
+
+            # Create a label for "Robot Status"
+            lbl_robot_status = tk.Label(robot_status_frame, text="Connection:", font=("Arial", 20))
+            lbl_robot_status.pack(side=tk.LEFT)
+
+            # Create a label to indicate the status (UPDATE REAL-TIME)
+            self.robot_status_label = tk.Label(robot_status_frame, text="Disconnected", font=("Arial", 16), bg="red", fg="white")
+            self.robot_status_label.pack(side=tk.LEFT, padx=20, ipadx=10)
 
             # Create a frame for "IP Address"
             ip_frame = tk.Frame(name_frame)
@@ -287,7 +305,7 @@ class SelfieDrawingApp:
             initRobot_buttons_frame.grid(row=3, column=0, columnspan=1, sticky="w", pady= 10)
 
             # Create a button for "Init"
-            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize Robot UR3", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 52, command= lambda: self.init_robot_ur3(), relief="raised", borderwidth=3, highlightthickness=2)
+            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize UR3 Robot", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 56, command= lambda: self.init_robot_ur3(), relief="raised", borderwidth=3, highlightthickness=2)
             initRobot_button.pack(side=tk.LEFT, padx=10)
 
             #--------------------------------------------- Draw Buttons
@@ -296,8 +314,8 @@ class SelfieDrawingApp:
             additional_buttons_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
 
             # Create a button for "Draw!"
-            draw_button = tk.Button(additional_buttons_frame, text="3. Draw!", font=("Arial", 16), bg="#008000", fg="#FFFFFF", width=50, command= lambda: self.start_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
-            draw_button.pack(side=tk.LEFT)
+            draw_button = tk.Button(additional_buttons_frame, text="3. Draw!", font=("Arial", 16), bg="#008000", fg="#FFFFFF", width=56, command= lambda: self.start_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
+            draw_button.pack(side=tk.LEFT, padx=(10, 30))
 
             #--------------------------------------------- Stopping Buttons
             # Create a frame for Stopping buttons
@@ -306,19 +324,28 @@ class SelfieDrawingApp:
             
             # Create a button for "Stop"
             stop_button = tk.Button(stopping_buttons_frame, text="Stop", font=("Arial", 16), bg="#ff0000", fg="#FFFFFF", width=25, command=lambda: self.stop_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
-            stop_button.pack(side=tk.LEFT)
+            stop_button.pack(side=tk.LEFT, padx=(10, 30))
 
             # Create a button for "Run Test"
-            run_test_button = tk.Button(stopping_buttons_frame, text="Release Stop", font=("Arial", 16), bg="#0000FF", fg="#FFFFFF", width=25, command=lambda: self.release_stop(), relief="raised", borderwidth=3, highlightthickness=2)
-            run_test_button.pack(side=tk.LEFT, padx=10)
+            run_test_button = tk.Button(stopping_buttons_frame, text="Continue", font=("Arial", 16), bg="#0000FF", fg="#FFFFFF", width=25, command=lambda: self.release_stop(), relief="raised", borderwidth=3, highlightthickness=2)
+            run_test_button.pack(side=tk.LEFT, padx=(10))
             
             #------------------------------------------- Terminate button
             # Create a frame for terminate button
             terminate_frame = tk.Frame(self.tab_easy_mode)
             terminate_frame.grid(row=6, column=0, columnspan=1, sticky="w", pady= 10)
             # Create a button for termination
-            terminate_button = tk.Button(terminate_frame,text="4. End Drawing", font=("Arial", 16), bg="#000000", fg="#FFFFFF", command= lambda: self.terminate_process(), width=52, relief="raised", borderwidth=3, highlightthickness=2)
+            terminate_button = tk.Button(terminate_frame,text="4. End Drawing", font=("Arial", 16), bg="#000000", fg="#FFFFFF", command= lambda: self.terminate_process(), width=56, relief="raised", borderwidth=3, highlightthickness=2)
             terminate_button.pack(side=tk.LEFT, padx=10)
+            
+            # Create frame for copy-right text.
+            cr_frame = tk.Frame(self.tab_easy_mode)
+            cr_frame.grid(row=10, column=2, padx=10, pady=10, sticky='ns')
+            
+            # Add copy-right text.
+            copy_right = tk.Label(cr_frame, text="Brought to you by Group 23", font=("Arial", 15))
+            copy_right.grid(row=0, column=0)
+            
 
 
     #-------------------- Init Dev Tab
@@ -522,6 +549,14 @@ class SelfieDrawingApp:
 
         pen_3 = tk.Button(changing_pen_frame, text="Pen 3", font=("Arial", 16), command= lambda: self.selectPen3())
         pen_3.pack(side=tk.LEFT, padx= 10)
+        
+        # Create frame for copy-right text.
+        cr_frame = tk.Frame(self.tab_robot_draw)
+        cr_frame.grid(row=10, column=2, padx=10, pady=10, sticky='ns')
+        
+        # Add copy-right text.
+        copy_right = tk.Label(cr_frame, text="Brought to you by Group 23", font=("Arial", 15))
+        copy_right.grid(row=0, column=0)
 
 
 
