@@ -125,11 +125,17 @@ class UR3_Movement(object):
         self.check_goal_reached_thread = threading.Thread(target=self._check_goal_reached)
         self.check_goal_reached_thread.start()
 
-        self.home_joint_angle_original = [20, -100, -125, -26, -280, 20]  #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
-        self.home_joint_angle_original = np.deg2rad(self.home_joint_angle_original)
+# This joint angle is perfect for 150mm Square without self-collision: [0.3438, -1.7949, -2.1418, -0.4759, -4.8844, -5.9389]
+        self.home_joint_angle_original = [0.3438, -1.7949, -2.1418, -0.4759, -4.8844, 0.349] #[20, -100, -125, -26, -280, 20]  #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
+        # self.home_joint_angle_original = np.deg2rad(self.home_joint_angle_original)
 
-        self.home_joint_angle = [20, -100, -125, -26, -280, 20]
-        self.home_joint_angle = np.deg2rad(self.home_joint_angle)
+        self.home_joint_angle = [0.3438, -1.7949, -2.1418, -0.4759, -4.8844, 0.349] # [20, -100, -125, -26, -280, 20]
+        # self.home_joint_angle = np.deg2rad(self.home_joint_angle)
+
+        self.step_to_draw = 0 # 0: draw SVG file, 1: draw Square Frame, 2: draw Signature
+        
+        self.frame_pose_goals_list = [] # List of goal pose of a frame
+
 
     except rospy.ROSException as e:
         print("Error initializing UR3_Movement:", str(e))
@@ -146,6 +152,11 @@ class UR3_Movement(object):
     self.goal_pose_list.append(pose_goal_positions)
     self.enable_check_event.set()
     print ("\nAll goals are imported !")
+
+  def set_frame_pose_goals_list(self, frame_pose_goal_positions):
+    self.frame_pose_goals_list.clear()
+    self.frame_pose_goals_list.append(frame_pose_goal_positions)
+    print ("\nFrame Ready !")
 
   def _check_goal_pose_list(self):
     """
@@ -176,9 +187,47 @@ class UR3_Movement(object):
         except:
           print("Finish all goals")
           self.homing_ur3()
-          self.enable_check_event.clear()
+          self.step_to_draw += 1
+          
+          if self.step_to_draw == 1:
+            self.draw_frame()
+          elif self.step_to_draw == 2:
+            self.draw_signature()
+          elif self.step_to_draw == 3:
+            print("Enjoy Drawing !!!")
+            self.step_to_draw = 0
+            self.enable_check_event.clear()
+          
 
       rate.sleep()
+
+
+  def draw_frame(self):
+    print("\nChanging Pen 2...")
+    self.change2Pen2()
+    time.sleep(3)
+    print("\nWaiting to draw Frame ............")
+    self.set_origin_pose()
+    print("\nContinue drawing Frame............")
+    self.goal_pose_list.clear()
+    self.goal_pose_list.extend(copy.deepcopy(self.frame_pose_goals_list))
+    
+    time.sleep(2)
+    self.enable_check_event.set()
+  
+  def draw_signature(self):
+    self.change2Pen3()
+    time.sleep(5)
+    print("\nWaiting to draw Signature ............")
+    self.set_origin_pose()
+    print("\nContinue drawing Frame............")
+    self.goal_pose_list.clear()
+    
+    #### Create SVG signature
+    print("\n To be continue... ")
+
+
+
 
 # ------------------ Jogging movement
   def increase_x_tcp(self, value):

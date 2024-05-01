@@ -92,7 +92,7 @@ class SelfieDrawingApp:
         # Set the icon for the application window
         pic_path = os.path.join(self.home_directory, 'rs2_ws', 'icon', 'Designer.png')  # Specify the path to your icon file
         # Open the original image
-        # original_image = Image.open(pic_path)
+        original_image = Image.open(pic_path)
         # Resize the image to 32x32 pixels (you can adjust the size as needed)
         resized_image = original_image.resize((100, 100))
         window_pic_path = os.path.join(self.home_directory, 'rs2_ws', 'icon', 'Designer_resized.png')  # Specify the path to your icon file
@@ -511,7 +511,7 @@ class SelfieDrawingApp:
         reset_home_button.pack(side= tk.LEFT, padx=5)
 
         # Create a button for "Set Zero Position" / "Set Origin"
-        set_origin_button = tk.Button(set_button_frame, text= "Offset Picture", font=("Arial", 16), width= 10, command= lambda: self.offset_picture())
+        set_origin_button = tk.Button(set_button_frame, text= "Set Origin", font=("Arial", 16), width= 10, command= lambda: self.set_origin_ur3())
         set_origin_button.pack(side=tk.LEFT, padx=5)
 
 
@@ -603,6 +603,8 @@ class SelfieDrawingApp:
 
 
 
+
+
     #-------------------- Button for Jogging X,Y
     def increase_x_movement(self):
         value = float(self.unit_mm_entry.get())
@@ -658,8 +660,21 @@ class SelfieDrawingApp:
             offset_gcode_path = self.offset_gcode(self.gcode_path, self.desire_x_pos, self.desire_y_pos)
             pose_goal_positions = self.gcode2pose(offset_gcode_path)
             self.ur3_operate.set_pose_goals_list(pose_goal_positions)
+            
+            # Import Pose Goal position of Frame
+            frame_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'frame_square_150mm.gcode')
+            offset_frame_gcode_path = self.offset_gcode(frame_gcode_path, self.desire_x_pos, self.desire_y_pos)
+            frame_pose_goal_positions = self.gcode2pose(offset_frame_gcode_path)
+            self.ur3_operate.set_frame_pose_goals_list(frame_pose_goal_positions)
+
+            
+
         else:
             print("No Gcode file selected.")
+
+
+
+
     #-------------------- Buttons for Robot
     def connect_to_robot(self):
         # Get the IP address from the entry widget
@@ -755,7 +770,7 @@ class SelfieDrawingApp:
     def reset_home_ur3(self):
         self.ur3_operate.reset_home()
 
-    def offset_picture(self):
+    def set_origin_ur3(self):
         tcp_pose_x,tcp_pose_y,tcp_pose_z,tcp_ori_x,tcp_ori_y,tcp_ori_z = self.ur3_operate.get_tcp()
         self.desire_x_pos = tcp_pose_x
         self.desire_y_pos = tcp_pose_y
@@ -785,31 +800,6 @@ class SelfieDrawingApp:
         self.ur3_operate.clear_all_goals()
 
 
-
-
-    def gcode2pose(self, new_gcode_path):
-        # Read the Gcode file and extract the pose goal positions
-        # gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
-        gcode_file_path = new_gcode_path
-        pose_goal_positions = []
-
-        with open (gcode_file_path, 'r') as file:
-            for line in file:
-                if line.startswith('G0'):
-                    # Extract X,Y coordinates from the gcode file
-                    x = float(line.split('X')[1].split(' ')[0])
-                    y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.16
-                    pose_goal_positions.append([x,y,z])
-
-                elif line.startswith('G1'):
-                    # Extract X,Y coordinates from the gcode file
-                    x = float(line.split('X')[1].split(' ')[0])
-                    y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.125
-                    pose_goal_positions.append([x,y,z])
-
-        return pose_goal_positions
 
     #------------------- Update TCP of UR3 Threading
     def init_update_tcp_thread(self):
@@ -841,8 +831,6 @@ class SelfieDrawingApp:
             rate.sleep()
 
 
-
-
     #-------------------- Threading for Updating GUI status
     def _update_GUI_status(self):
         rate = rospy.Rate(10)
@@ -860,8 +848,6 @@ class SelfieDrawingApp:
         
             rate.sleep()
 
-
-        
 
     #-------------------- Threading for Timer
 
@@ -1044,11 +1030,26 @@ class SelfieDrawingApp:
 
         return new_gcode_path
 
+    def gcode2pose(self, new_gcode_path):
+        # Read the Gcode file and extract the pose goal positions
+        # gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
+        gcode_file_path = new_gcode_path
+        pose_goal_positions = []
 
-# def main():
-#     root = tk.Tk()
-#     SelfieDrawingApp(root)
-#     root.mainloop()
+        with open (gcode_file_path, 'r') as file:
+            for line in file:
+                if line.startswith('G0'):
+                    # Extract X,Y coordinates from the gcode file
+                    x = float(line.split('X')[1].split(' ')[0])
+                    y = float(line.split('Y')[1].split(' ')[0])
+                    z = 0.16
+                    pose_goal_positions.append([x,y,z])
 
-# if __name__ == "__main__":
-#     main()
+                elif line.startswith('G1'):
+                    # Extract X,Y coordinates from the gcode file
+                    x = float(line.split('X')[1].split(' ')[0])
+                    y = float(line.split('Y')[1].split(' ')[0])
+                    z = 0.125
+                    pose_goal_positions.append([x,y,z])
+
+        return pose_goal_positions
