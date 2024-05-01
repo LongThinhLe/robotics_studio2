@@ -285,6 +285,9 @@ class SelfieDrawingApp:
         self.ip_entry = tk.Entry(ip_frame, font=("Arial", 16), width=15)
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
+        # Set the initial value of the entry widget
+        self.ip_entry.insert(0, "192.168.0.250")
+
         # Create a button to connect
         self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
         self.connect_button.pack(side=tk.LEFT)
@@ -325,7 +328,10 @@ class SelfieDrawingApp:
         open_file_frame.grid(row=1, column=2, rowspan=2, padx=10, pady=60, ipadx=5, ipady=5, sticky="w")
 
         open_file_button = tk.Button(open_file_frame, text="Open Gcode file", font=("Arial", 20), command= lambda: self.open_file_dialog())
-        open_file_button.pack()
+        open_file_button.grid(row=0, column=0)
+
+        import_gcode_button = tk.Button(open_file_frame, text= "Import Gcode", font=("Arial", 20), command= lambda: self.import_gcode())
+        import_gcode_button.grid(row=1, column=0, pady= 5)
 
         #------------------------------------------- Connection Selection
         # Create a frame for connection selection
@@ -388,15 +394,25 @@ class SelfieDrawingApp:
         set_button_frame.grid(row=5, column=0, columnspan=1, sticky="w", pady= 10)
 
         # Create a button for "Init"
-        homing_button = tk.Button(set_button_frame, text="Homing", font=("Arial", 16), width= 15, command= lambda: self.homing_ur3())
+        homing_button = tk.Button(set_button_frame, text="Homing", font=("Arial", 16), width= 5, command= lambda: self.homing_ur3())
         homing_button.pack(side=tk.LEFT, padx=10)
 
+        # Create a button for "Set New Home"
+        set_new_home_button = tk.Button(set_button_frame, text= "New Home", font=("Arial", 16), width= 10, command= lambda: self.set_new_home_ur3())
+        set_new_home_button.pack(side=tk.LEFT, padx=5)
+
+        # Create button for "Reset Home"
+        reset_home_button = tk.Button(set_button_frame, text= "Reset Home", font=("Arial", 16), width= 10, command= lambda: self.reset_home_ur3() )
+        reset_home_button.pack(side= tk.LEFT, padx=5)
+
         # Create a button for "Set Zero Position" / "Set Origin"
-        set_origin_button = tk.Button(set_button_frame, text= "Set Origin", font=("Arial", 16), width= 15, command= lambda: self.set_origin_ur3())
+        set_origin_button = tk.Button(set_button_frame, text= "Offset Picture", font=("Arial", 16), width= 10, command= lambda: self.offset_picture())
         set_origin_button.pack(side=tk.LEFT, padx=5)
 
-        import_file_gcode_button = tk.Button(set_button_frame, text= "Import Gcode", font=("Arial", 16), width= 15, command= lambda: self.import_gcode())
-        import_file_gcode_button.pack(side=tk.LEFT, padx=5)
+
+        # # Create a button for Importing file Gcode
+        # import_file_gcode_button = tk.Button(set_button_frame, text= "Import Gcode", font=("Arial", 16), width= 10, command= lambda: self.import_gcode())
+        # import_file_gcode_button.pack(side=tk.LEFT, padx=5)
 
         #--------------------------------------------- Draw Buttons
         # Create a frame for drawing buttons
@@ -445,17 +461,60 @@ class SelfieDrawingApp:
         pen_3 = tk.Button(changing_pen_frame, text="Pen 3", font=("Arial", 16), command= lambda: self.selectPen3())
         pen_3.pack(side=tk.LEFT, padx= 10)
 
+        #--------------------------------------------- Button Moving X+ Y+ X- Y- TCP
+
+        moving_tcp_frame = tk.Frame(self.tab_robot_draw)
+        moving_tcp_frame.grid(row= 8, column= 0, columnspan=1, sticky= "w", pady= 5)
+
+        increase_x = tk.Button(moving_tcp_frame, text= "X+", font=("Arial", 16), command= lambda: self.increase_x_movement())
+        increase_x.pack(side= tk.LEFT, padx= 10)
+
+        decrease_x = tk.Button(moving_tcp_frame, text= "X-", font=("Arial", 16), command= lambda: self.decrease_x_movement())
+        decrease_x.pack(side= tk.LEFT, padx= 10)
+
+        increase_y = tk.Button(moving_tcp_frame, text= "Y+", font=("Arial", 16), command= lambda: self.increase_y_movement())
+        increase_y.pack(side= tk.LEFT, padx= 10)
+
+        decrease_y = tk.Button(moving_tcp_frame, text= "Y-", font=("Arial", 16), command= lambda: self.decrease_y_movement())
+        decrease_y.pack(side= tk.LEFT, padx= 10)
+
+        # Lable for unit input 
+        lbl_unit_mm = tk.Label(moving_tcp_frame, text= "Unit in mm", font =("Arial", 20))
+        lbl_unit_mm.pack(side=tk.LEFT)
+
+        # Create an entry for unit mm input
+        self.unit_mm_entry = tk.Entry(moving_tcp_frame, font=("Arial", 16), width=15)
+        self.unit_mm_entry.pack(side=tk.LEFT, padx=10)
+        self.unit_mm_entry.insert(0,"5")
+
+
+
+
+    #-------------------- Button for Jogging X,Y
+    def increase_x_movement(self):
+        value = float(self.unit_mm_entry.get())
+        self.ur3_operate.increase_x_tcp(value)
+
+    def decrease_x_movement(self):
+        value = float(self.unit_mm_entry.get())
+        self.ur3_operate.decrease_x_tcp(value)
+
+    def increase_y_movement(self):
+        value = float(self.unit_mm_entry.get())
+        self.ur3_operate.increase_y_tcp(value)
+
+    def decrease_y_movement(self):
+        value = float(self.unit_mm_entry.get())
+        self.ur3_operate.decrease_y_tcp(value)
+
 
 
     #-------------------- Button for Changing Pen
     def change2leftpen(self):
         self.ur3_operate.change2leftpen()
 
-
-
     def change2rightpen(self):
         self.ur3_operate.change2rightpen()
-
 
     def selectPen1(self):
         self.ur3_operate.change2Pen1()
@@ -475,9 +534,19 @@ class SelfieDrawingApp:
         self.gcode_path = filedialog.askopenfilename(title="Select Gcode file", initialdir= initial_directory, filetypes=[("Gcode files", "*.gcode")])
         if self.gcode_path:
             print("Selected Gcode file:", self.gcode_path)
+            # self.import_gcode()
         else:
             print("No file selected.")
 
+    def import_gcode(self): # should include after opening file
+        if self.gcode_path:
+            # Perform import operations using the selected Gcode file path
+            print("Open Gcode file at: ", self.gcode_path)
+            offset_gcode_path = self.offset_gcode(self.gcode_path, self.desire_x_pos, self.desire_y_pos)
+            pose_goal_positions = self.gcode2pose(offset_gcode_path)
+            self.ur3_operate.set_pose_goals_list(pose_goal_positions)
+        else:
+            print("No Gcode file selected.")
     #-------------------- Buttons for Robot
     def connect_to_robot(self):
         # Get the IP address from the entry widget
@@ -567,7 +636,13 @@ class SelfieDrawingApp:
         # Homing robot with specific joint state
         self.ur3_operate.homing_ur3()
 
-    def set_origin_ur3(self):
+    def set_new_home_ur3(self):
+        self.ur3_operate.set_new_home()
+
+    def reset_home_ur3(self):
+        self.ur3_operate.reset_home()
+
+    def offset_picture(self):
         tcp_pose_x,tcp_pose_y,tcp_pose_z,tcp_ori_x,tcp_ori_y,tcp_ori_z = self.ur3_operate.get_tcp()
         self.desire_x_pos = tcp_pose_x
         self.desire_y_pos = tcp_pose_y
@@ -576,15 +651,7 @@ class SelfieDrawingApp:
         self.ur3_operate.set_origin_pose()
         print ("\nSet origin pose")
  
-    def import_gcode(self):
-        if self.gcode_path:
-            # Perform import operations using the selected Gcode file path
-            print("Open Gcode file at: ", self.gcode_path)
-            offset_gcode_path = self.offset_gcode(self.gcode_path, self.desire_x_pos, self.desire_y_pos)
-            pose_goal_positions = self.gcode2pose(offset_gcode_path)
-            self.ur3_operate.set_pose_goals_list(pose_goal_positions)
-        else:
-            print("No Gcode file selected.")
+
     
 
     def start_drawing(self):
@@ -853,7 +920,7 @@ class SelfieDrawingApp:
                                 y_coord = float(part[1:])
                         if x_coord is not None and y_coord is not None:
                             # Apply offset
-                            x_coord += offset_x
+                            x_coord += offset_x * 1.08 # Adjust this parameter to modify the frame inside working area
                             y_coord += offset_y
                             # Write modified line to new file
                             new_line = f"{parts[0]} X{x_coord:.6f} Y{y_coord:.6f}\n"

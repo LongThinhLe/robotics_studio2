@@ -6,7 +6,7 @@ import copy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
-from moveit_msgs.msg import Constraints, OrientationConstraint
+from moveit_msgs.msg import Constraints, OrientationConstraint, PositionConstraint
 
 import numpy as np
 import time
@@ -72,32 +72,37 @@ class UR3_Movement(object):
         scene = moveit_commander.PlanningSceneInterface()
         move_group = moveit_commander.MoveGroupCommander("manipulator")
         display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path', moveit_msgs.msg.DisplayTrajectory, queue_size=20)
-        orientation_constraint = OrientationConstraint()
+       
         path_constraints = Constraints()
+        orientation_constraint = OrientationConstraint()
+        position_constraint = PositionConstraint()
 
         # Store objects as attributes
         self.robot = robot
         self.scene = scene
         self.move_group = move_group
         self.display_trajectory_publisher = display_trajectory_publisher
-        self.orientation_constraint = orientation_constraint
+        
         self.path_constraints = path_constraints
+        self.orientation_constraint = orientation_constraint
+        self.position_constraint = position_constraint
 
         # Print information for debugging
-        planning_frame = move_group.get_planning_frame()
-        eef_link = move_group.get_end_effector_link()
-        group_names = robot.get_group_names()
+        self.planning_frame = move_group.get_planning_frame()
+        self.eef_link = move_group.get_end_effector_link()
+        self.group_names = robot.get_group_names()
         
 
-        print("============ Planning frame:", planning_frame)
-        print("============ End effector link:", eef_link)
-        print("============ Available Planning Groups:", group_names)
+        print("============ Planning frame:", self.planning_frame)
+        print("============ End effector link:", self.eef_link)
+        print("============ Available Planning Groups:", self.group_names)
         print("============ Printing robot state")
         print(robot.get_current_state())
         print("")
 
         # Adjust the tolerance of reaching goal !!!!!!!!!!!!!!!!!!!!!!!!
         self.move_group.set_goal_tolerance(0.00001)
+        self.move_group.set_goal_joint_tolerance(0.000001)
         self.move_group.set_max_velocity_scaling_factor(0.2)
 
         self.target_pose = None
@@ -120,7 +125,10 @@ class UR3_Movement(object):
         self.check_goal_reached_thread = threading.Thread(target=self._check_goal_reached)
         self.check_goal_reached_thread.start()
 
-        self.home_joint_angle = [20, -100, -125, -26, -280, 20] #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
+        self.home_joint_angle_original = [20, -100, -125, -26, -280, 20]  #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
+        self.home_joint_angle_original = np.deg2rad(self.home_joint_angle_original)
+
+        self.home_joint_angle = [20, -100, -125, -26, -280, 20]
         self.home_joint_angle = np.deg2rad(self.home_joint_angle)
 
     except rospy.ROSException as e:
@@ -129,8 +137,6 @@ class UR3_Movement(object):
 
 #------------------- Draw from Gcode file
   def start_drawing(self):
-
-
     # Start the thread drawing
     self.check_goals_thread = threading.Thread(target=self._check_goal_pose_list)
     self.check_goals_thread.start()
@@ -174,15 +180,163 @@ class UR3_Movement(object):
 
       rate.sleep()
 
+# ------------------ Jogging movement
+  def increase_x_tcp(self, value):
+  
+    self.set_position_constraint(value_x= value, value_y= 0, value_z= 0, weight= 1.0)
+    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    
+    waypoints = []
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    wpose.position.x += value/1000
+    waypoints.append(copy.deepcopy(wpose))
+
+    if value > 10: eef_step = 0.01
+    else: eef_step = 0.0001
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    if fraction >= 0.2:
+      self.move_group.execute(plan, wait = False)
+      self.move_group.stop()  
+
+    del waypoints
+    del wpose
+
+
+  def decrease_x_tcp(self, value):
+    self.set_position_constraint(value_x= value, value_y= 0, value_z= 0, weight= 1.0)
+    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    
+    waypoints = []
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    wpose.position.x -= value/1000
+    waypoints.append(copy.deepcopy(wpose))
+
+    if value > 10: eef_step = 0.01
+    else: eef_step = 0.0001
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    if fraction >= 0.2:
+      self.move_group.execute(plan, wait = False)
+      self.move_group.stop()  
+
+    del waypoints
+    del wpose
+
+
+
+  def increase_y_tcp(self, value):
+    self.set_position_constraint(value_x= 0, value_y= value, value_z= 0, weight= 1.0)
+    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    
+    waypoints = []
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    wpose.position.y += value/1000
+    waypoints.append(copy.deepcopy(wpose))
+
+    if value > 10: eef_step = 0.01
+    else: eef_step = 0.0001
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    if fraction >= 0.2:
+      self.move_group.execute(plan, wait = False)
+      self.move_group.stop()  
+
+    del waypoints
+    del wpose
+
+
+  def decrease_y_tcp(self, value):
+    self.set_position_constraint(value_x= 0, value_y= value, value_z= 0, weight= 1.0)
+    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    
+    waypoints = []
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    wpose.position.y -= value/1000
+    waypoints.append(copy.deepcopy(wpose))
+
+    if value > 10: eef_step = 0.01
+    else: eef_step = 0.0001
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    if fraction >= 0.2:
+      self.move_group.execute(plan, wait = False)
+      self.move_group.stop()  
+
+    del waypoints
+    del wpose
+
+
+  def set_joint_constraint(self): #### EXPERIMENTAL
+    forward_traj_constraints = moveit_msgs.msg.Constraints()
+    forward_traj_constraints.name = "forward_traj_constraints"
+    joint5_constraint = moveit_msgs.msg.JointConstraint(
+      joint_name = "joint5",
+      position = 0,
+      tolerance_above = math.pi/3,
+      tolerance_below = math.pi/3,
+      weight = 0.8,
+    )
+
+    forward_traj_constraints.joint_constraints.extend([joint5_constraint])
+    traj_constraints = moveit_msgs.msg.TrajectoryConstraints()
+    traj_constraints.constraints.append(forward_traj_constraints)
+    self.move_group.set_path_constraints(forward_traj_constraints)
+
+  def set_position_constraint(self, value_x, value_y, value_z, weight = 1.0):
+    self.clear_position_constraints()
+
+    self.position_constraint.header.frame_id = self.planning_frame
+    self.position_constraint.link_name = self.eef_link
+
+    constraint_pose = geometry_msgs.msg.Pose() # change to get_current_pose().pose if neccessary
+    constraint_pose.position.x = value_x # value = 0 if keep it fixed
+    constraint_pose.position.y = value_y
+    constraint_pose.position.z = value_z 
+
+    self.position_constraint.constraint_region.primitive_poses.append(constraint_pose)
+    self.position_constraint.weight = weight
+
+    self.path_constraints.position_constraints.append(self.position_constraint)
+    self.move_group.set_path_constraints(self.path_constraints)
+
+
+  def set_orientation_constraint(self, tol_x, tol_y, tol_z, weight = 1.0):
+    self.clear_orientation_constraints()
+
+    self.orientation_constraint.header.frame_id = self.planning_frame
+    self.orientation_constraint.link_name = self.eef_link
+
+    self.start_pose = self.move_group.get_current_pose().pose
+    self.orientation_constraint.orientation = self.start_pose.orientation # Keep the current orientation for the next goal
+    self.orientation_constraint.absolute_x_axis_tolerance = tol_x # 0.00005
+    self.orientation_constraint.absolute_y_axis_tolerance = tol_y # 0.00005
+    self.orientation_constraint.absolute_z_axis_tolerance = tol_z # 0.00005
+    self.orientation_constraint.weight =  weight # 1.0 is fully considered during motion planning
+
+    self.path_constraints.orientation_constraints.append(self.orientation_constraint)
+    self.move_group.set_path_constraints(self.path_constraints)
 
 #-------------------  Movement threading
   def homing_ur3(self):
     self.clear_orientation_constraints()
+    self.clear_position_constraints()
     # joint_deg = [20, -100, -125, -26, -280, 20] #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
     # joint_goal = np.deg2rad(joint_deg)
     self.start_movement(self.home_joint_angle)
 
   def start_movement(self, target_pose): # THIS FUNCTION IS USED FOR STARTING THE THREAD TO ROBOT GO TO PRESET GOAL
+    start_pose = self.move_group.get_current_pose().pose
+    self.start_orientation = start_pose.orientation
+    
     self.target_pose = target_pose
     self.completeGoal_flag.clear() # Always clear Complete Goal Flag before moving to goal
     self.move_thread = threading.Thread(target=self._move_to_target) # Start and Stop this thread to run the robot
@@ -199,21 +353,15 @@ class UR3_Movement(object):
     print("\n----------Clear Stop Flag----------\n")
     self.stop_flag.clear()
 
+  def set_new_home(self):
+    self.home_joint_angle = copy.deepcopy(self.move_group.get_current_joint_values())
+
+  def reset_home(self):
+    self.home_joint_angle = copy.deepcopy(self.home_joint_angle_original)
+
+
   def set_origin_pose(self):
-    # Set orientation constraint
-    self.orientation_constraint.header.frame_id = self.move_group.get_planning_frame()
-    self.orientation_constraint.link_name = self.move_group.get_end_effector_link()
-    self.start_pose = self.move_group.get_current_pose().pose
-    self.orientation_constraint.orientation = self.start_pose.orientation # Keep the current orientation for the next goal
-    self.orientation_constraint.absolute_x_axis_tolerance = 0.05
-    self.orientation_constraint.absolute_y_axis_tolerance = 0.05
-    self.orientation_constraint.absolute_z_axis_tolerance = 0.05
-    self.orientation_constraint.weight = 1.0 # 1.0 is fully considered during motion planning
-
-    # Create path constraints
-    self.path_constraints.orientation_constraints.append(self.orientation_constraint)
-    self.move_group.set_path_constraints(self.path_constraints)
-
+    self.set_orientation_constraint(0.0005, 0.0005, 0.0005)
     self.target_pose = None
     start_pose = self.move_group.get_current_pose().pose
     self.start_orientation = start_pose.orientation
@@ -223,13 +371,21 @@ class UR3_Movement(object):
   def clear_orientation_constraints(self):
     # Clear orientation constraint after use
     self.path_constraints.orientation_constraints = []
-    self.move_group.set_path_constraints(self.path_constraints)
+    # empty_constraints = Constraints()
+    # self.move_group.set_path_constraints(empty_constraints)
+    self.move_group.clear_path_constraints()
+
+  def clear_position_constraints(self):
+    # Clear position constraint after use
+    self.path_constraints.position_constraints = []
+    # self.move_group.set_path_constraints(self.path_constraints)
+    self.move_group.clear_path_constraints()
 
   def clear_all_goals(self):
     self.goal_pose_list.clear()
     self.enable_check_event.clear()
 
-  def move_with_orientation_constraint(self, target_pose, scale = 1):
+  def move_with_orientation_constraint(self, target_pose):
     waypoints = []
     current_pose = self.move_group.get_current_pose().pose
     wpose = copy.deepcopy(current_pose)
@@ -245,16 +401,18 @@ class UR3_Movement(object):
     wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.001, jump_threshold= 0.0)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.01, jump_threshold= 0.0)
     if fraction >= 0.2:
       self.move_group.execute(plan, wait = False)
-      self.move_group.stop()
-      
+      self.move_group.stop()  
     else: print("----------------\nFailed to plan the trajectory!\n------------------")
+    
     del waypoints
     del wpose
 
-  def _check_goal_reached(self): ########
+
+########################################################
+  def _check_goal_reached(self): 
     rate = rospy.Rate(10)
     while True:
       
@@ -308,7 +466,7 @@ class UR3_Movement(object):
       rate.sleep()
 
 
-  ####################
+  #########################################################################
   def _move_to_target(self):  ## FIX PLAN CARTERSIAN AND EXECUTE PLAN INSTEAD OF STATIC JOINT ANGLES
     rate = rospy.Rate(10)  # Adjust the rate based on your requirements
     print ("\nGo into move to target thread \n")
@@ -327,7 +485,7 @@ class UR3_Movement(object):
             self.move_group.stop()  # Stop any ongoing movement
             target_pose = None  # Reset target pose after movement
 
-        elif len(target_pose) == 3:
+        elif len(target_pose) == 3: # ----- Gcode X,Y,Z
           if not self.set_pos_goal_once.is_set():
             print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
             self.move_with_orientation_constraint(target_pose)
@@ -351,7 +509,10 @@ class UR3_Movement(object):
 
 #------------------- Changing Pen
   def change2leftpen(self):
-    current_joint = self.move_group.get_current_joint_values()
+    self.clear_position_constraints()
+    self.clear_orientation_constraints()
+
+    current_joint = copy.deepcopy(self.move_group.get_current_joint_values())
     print("\nCurrent Joint = \n", current_joint)
 
     # Access to the last joint angle
@@ -361,14 +522,14 @@ class UR3_Movement(object):
       print("\nThe TCP joint angle exceeds Joint Limit ! Cannot move !")
       current_joint[-1] -= math.radians(90)
 
-    start_pose = self.move_group.get_current_pose().pose
-    self.start_orientation = start_pose.orientation
-
     self.start_movement(current_joint)
 
 
   def change2rightpen(self):
-    current_joint = self.move_group.get_current_joint_values()
+    self.clear_position_constraints()
+    self.clear_orientation_constraints()
+
+    current_joint = copy.deepcopy(self.move_group.get_current_joint_values())
     print("\nCurrent Joint = \n", current_joint)
 
     # Access to the last joint angle
@@ -378,33 +539,33 @@ class UR3_Movement(object):
       print("\nThe TCP joint angle exceeds Joint Limit ! Cannot move !")
       current_joint[-1] += math.radians(90)
 
-    start_pose = self.move_group.get_current_pose().pose
-    self.start_orientation = start_pose.orientation
-
     self.start_movement(current_joint)
 
 
   def change2Pen1(self):
+    self.clear_position_constraints()
+    self.clear_orientation_constraints()
     current_joint = copy.deepcopy(self.home_joint_angle)
     current_joint[-1] = math.radians(20)
-    start_pose = self.move_group.get_current_pose().pose
-    self.start_orientation = start_pose.orientation
+
     self.start_movement(current_joint)
 
 
   def change2Pen2(self):
+    self.clear_position_constraints()
+    self.clear_orientation_constraints()
     current_joint = copy.deepcopy(self.home_joint_angle)
     current_joint[-1] = math.radians(110)
-    start_pose = self.move_group.get_current_pose().pose
-    self.start_orientation = start_pose.orientation
+
     self.start_movement(current_joint)
 
   
   def change2Pen3(self):
+    self.clear_position_constraints()
+    self.clear_orientation_constraints()
     current_joint = copy.deepcopy(self.home_joint_angle)
     current_joint[-1] = math.radians(-70)
-    start_pose = self.move_group.get_current_pose().pose
-    self.start_orientation = start_pose.orientation
+
     self.start_movement(current_joint)
 
 

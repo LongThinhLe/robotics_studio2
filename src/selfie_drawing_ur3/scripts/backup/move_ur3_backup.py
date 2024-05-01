@@ -1,4 +1,198 @@
-  def move_with_orientation_constraint(self, target_pose, scale = 1):
+  def set_origin_pose(self):
+    # # Set orientation constraint
+    # self.orientation_constraint.header.frame_id = self.move_group.get_planning_frame()
+    # self.orientation_constraint.link_name = self.move_group.get_end_effector_link()
+    # self.start_pose = self.move_group.get_current_pose().pose
+    # self.orientation_constraint.orientation = self.start_pose.orientation # Keep the current orientation for the next goal
+    # self.orientation_constraint.absolute_x_axis_tolerance = 0.05
+    # self.orientation_constraint.absolute_y_axis_tolerance = 0.05
+    # self.orientation_constraint.absolute_z_axis_tolerance = 0.05
+    # self.orientation_constraint.weight = 1.0 # 1.0 is fully considered during motion planning
+
+    # # Create path constraints
+    # self.path_constraints.orientation_constraints.append(self.orientation_constraint)
+    # self.move_group.set_path_constraints(self.path_constraints)
+  
+    self.set_orientation_constraint()
+    self.target_pose = None
+    start_pose = self.move_group.get_current_pose().pose
+    self.start_orientation = start_pose.orientation
+    print ("This is origin orientation: \n", self.start_orientation)  
+
+def increase_y_tcp(self, value):
+    waypoints = []
+
+    wpose = self.move_group.get_current_pose().pose
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
+    wpose.position.y += value/1000
+    waypoints.append(copy.deepcopy(wpose))
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints,0.01,0.0)
+    self.move_group.execute(plan, wait=True)
+    self.move_group.stop()
+
+    del waypoints
+    del wpose
+
+
+
+def decrease_x_tcp(self, value):
+    self.set_position_constraint(value_x= value, value_y= 0, value_z= 0, weight= 1.0)
+    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    
+    waypoints = []
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    wpose.position.x -= value/1000
+    waypoints.append(copy.deepcopy(wpose))
+
+    print("Self Path Constraint: \n", self.path_constraints)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.0001, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    if fraction >= 0.2:
+      self.move_group.execute(plan, wait = False)
+      self.move_group.stop()  
+
+    del waypoints
+    del wpose
+
+    # self.set_orientation_constraint() # add
+
+    # constraints = Constraints()
+    # position_constraint = PositionConstraint()
+
+    # position_constraint.header.frame_id = self.planning_frame
+    # position_constraint.link_name = self.eef_link
+
+    # constraint_pose = geometry_msgs.msg.Pose()
+    # constraint_pose.position.x = value 
+    # constraint_pose.position.y = 0 # no constraint on Y
+    # constraint_pose.position.z = 0 # no constraint on Z
+    # position_constraint.constraint_region.primitive_poses.append(constraint_pose)
+
+    # position_constraint.weight = 1.0
+
+    # constraints.position_constraints.append(position_constraint)
+
+    # self.move_group.set_path_constraints(constraints)
+
+    # waypoints = []
+    # current_pose = self.move_group.get_current_pose().pose
+    # wpose = copy.deepcopy(current_pose)
+
+    # # wpose.orientation.x = self.start_orientation.x
+    # # wpose.orientation.y = self.start_orientation.y
+    # # wpose.orientation.z = self.start_orientation.z
+    # # wpose.orientation.w = self.start_orientation.w
+    # wpose.position.x -= value/1000
+    # # wpose.position.y = current_pose.position.y
+    # # wpose.position.z = current_pose.position.z
+    
+    # waypoints.append(copy.deepcopy(wpose))
+
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.01, jump_threshold= 0.0, path_constraints= constraints)
+    # if fraction >= 0.2:
+    #   self.move_group.execute(plan, wait = False)
+    #   self.move_group.stop()  
+
+    # self.clear_position_constraints()
+    # self.clear_orientation_constraints() # add
+    # del waypoints
+    # del wpose
+
+
+    # # waypoints = []
+
+    # # wpose = self.move_group.get_current_pose().pose
+    # # wpose.orientation.x = self.start_orientation.x
+    # # wpose.orientation.y = self.start_orientation.y
+    # # wpose.orientation.z = self.start_orientation.z
+    # # wpose.orientation.w = self.start_orientation.w
+    # # wpose.position.x -= value/1000
+    # # waypoints.append(copy.deepcopy(wpose))
+
+    # # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints,0.01,0.0)
+    # # self.move_group.execute(plan, wait=True)
+    # # self.move_group.stop()
+
+    # # del waypoints
+    # # del wpose
+  
+
+def increase_x_tcp(self, value):
+    self.set_position_constraint(value_x= value, value_y= 0, value_z= 0, weight= 1.0)
+    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    
+    waypoints = []
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    wpose.position.x += value/1000
+    waypoints.append(copy.deepcopy(wpose))
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.0001, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    if fraction >= 0.2:
+      self.move_group.execute(plan, wait = False)
+      self.move_group.stop()  
+
+    del waypoints
+    del wpose
+
+
+    #---------------------------------------
+
+    # self.set_orientation_constraint() ##
+
+    # constraints = Constraints()
+    # position_constraint = PositionConstraint()
+
+    # position_constraint.header.frame_id = self.planning_frame
+    # position_constraint.link_name = self.eef_link
+
+    # constraint_pose = geometry_msgs.msg.Pose()
+    # constraint_pose.position.x = value 
+    # constraint_pose.position.y = 0 # no constraint on Y
+    # constraint_pose.position.z = 0 # no constraint on Z
+    # position_constraint.constraint_region.primitive_poses.append(constraint_pose)
+
+    # position_constraint.weight = 1.0
+
+    # constraints.position_constraints.append(position_constraint)
+
+    # self.move_group.set_path_constraints(constraints)
+
+    # waypoints = []
+    # current_pose = self.move_group.get_current_pose().pose
+    # wpose = copy.deepcopy(current_pose)
+
+    # # wpose.orientation.x = self.start_orientation.x
+    # # wpose.orientation.y = self.start_orientation.y
+    # # wpose.orientation.z = self.start_orientation.z
+    # # wpose.orientation.w = self.start_orientation.w
+    # wpose.position.x += value/1000
+    # # wpose.position.y = current_pose.position.y
+    # # wpose.position.z = current_pose.position.z
+    
+    # waypoints.append(copy.deepcopy(wpose))
+
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.01, jump_threshold= 0.0, path_constraints= constraints)
+    # if fraction >= 0.2:
+    #   self.move_group.execute(plan, wait = False)
+    #   self.move_group.stop()  
+
+    # self.clear_position_constraints()
+    # self.clear_orientation_constraints() ##
+    # del waypoints
+    # del wpose
+
+
+
+
+
+def move_with_orientation_constraint(self, target_pose, scale = 1):
     # start_orientation_list = [self.start_orientation.x, self.start_orientation.y, self.start_orientation.z, self.start_orientation.w]
     # self.move_group.set_orientation_target(start_orientation_list)
     # plan = self.move_group.go(wait= True)
