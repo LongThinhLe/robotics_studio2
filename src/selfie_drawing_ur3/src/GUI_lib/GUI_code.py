@@ -305,7 +305,7 @@ class SelfieDrawingApp:
             initRobot_buttons_frame.grid(row=3, column=0, columnspan=1, sticky="w", pady= 10)
 
             # Create a button for "Init"
-            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize UR3 Robot", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 56, command= lambda: self.init_robot_ur3(), relief="raised", borderwidth=3, highlightthickness=2)
+            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize UR3 Robot", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 56, command= lambda: self.init_robot_ur3_ez(), relief="raised", borderwidth=3, highlightthickness=2)
             initRobot_button.pack(side=tk.LEFT, padx=10)
 
             #--------------------------------------------- Draw Buttons
@@ -329,14 +329,6 @@ class SelfieDrawingApp:
             # Create a button for "Run Test"
             run_test_button = tk.Button(stopping_buttons_frame, text="Continue", font=("Arial", 16), bg="#0000FF", fg="#FFFFFF", width=25, command=lambda: self.release_stop(), relief="raised", borderwidth=3, highlightthickness=2)
             run_test_button.pack(side=tk.LEFT, padx=(10))
-            
-            #------------------------------------------- Terminate button
-            # Create a frame for terminate button
-            terminate_frame = tk.Frame(self.tab_easy_mode)
-            terminate_frame.grid(row=6, column=0, columnspan=1, sticky="w", pady= 10)
-            # Create a button for termination
-            terminate_button = tk.Button(terminate_frame,text="4. End Drawing", font=("Arial", 16), bg="#000000", fg="#FFFFFF", command= lambda: self.terminate_process(), width=56, relief="raised", borderwidth=3, highlightthickness=2)
-            terminate_button.pack(side=tk.LEFT, padx=10)
             
             # Create frame for copy-right text.
             cr_frame = tk.Frame(self.tab_easy_mode)
@@ -666,11 +658,9 @@ class SelfieDrawingApp:
             offset_frame_gcode_path = self.offset_gcode(frame_gcode_path, self.desire_x_pos, self.desire_y_pos)
             frame_pose_goal_positions = self.gcode2pose(offset_frame_gcode_path)
             self.ur3_operate.set_frame_pose_goals_list(frame_pose_goal_positions)
-
-            
-
         else:
             print("No Gcode file selected.")
+    
 
 
 
@@ -760,6 +750,41 @@ class SelfieDrawingApp:
         # Start update thread Robot TCP
         self.init_update_tcp_thread()
     
+    def init_robot_ur3_ez(self):
+        print("initialising ur3")
+        # Initialize UR3
+        self.ur3_operate = UR3_Movement()
+        # Start get thread Robot TCP
+        self.ur3_operate.update_robot_tcp_thread()
+        time.sleep(0.2)
+        # Start update thread Robot TCP
+        self.init_update_tcp_thread()
+        print("ur3 initialised in ez mode")
+        print("now homing in ez mode")
+        # Homing robot with specific joint state
+        self.ur3_operate.homing_ur3()
+        print("ur3 homed in ez mode")
+        
+        print("now import gcode in ez mode")
+        self.gcode_path = "rs2_ws/gcode/ur3_draw.gcode"
+
+        print("now selecting gcode in ez mode")
+        if self.gcode_path:
+            # Perform import operations using the selected Gcode file path
+            print("Open Gcode file at: ", self.gcode_path)
+            offset_gcode_path = self.offset_gcode(self.gcode_path, self.desire_x_pos, self.desire_y_pos)
+            pose_goal_positions = self.gcode2pose(offset_gcode_path)
+            self.ur3_operate.set_pose_goals_list(pose_goal_positions)
+            
+            # Import Pose Goal position of Frame
+            frame_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'frame_square_150mm.gcode')
+            offset_frame_gcode_path = self.offset_gcode(frame_gcode_path, self.desire_x_pos, self.desire_y_pos)
+            frame_pose_goal_positions = self.gcode2pose(offset_frame_gcode_path)
+            self.ur3_operate.set_frame_pose_goals_list(frame_pose_goal_positions)
+        else:
+            print("No Gcode file selected.")
+        
+    
     def homing_ur3(self):
         # Homing robot with specific joint state
         self.ur3_operate.homing_ur3()
@@ -779,9 +804,6 @@ class SelfieDrawingApp:
         self.ur3_operate.set_origin_pose()
         print ("\nSet origin pose")
  
-
-    
-
     def start_drawing(self):
         self.ur3_operate.start_drawing()
 
@@ -798,7 +820,6 @@ class SelfieDrawingApp:
     def clear_all_goals(self):
         print("\n----------------\nAll Goals are clear !!!\n------------------\n")
         self.ur3_operate.clear_all_goals()
-
 
 
     #------------------- Update TCP of UR3 Threading
