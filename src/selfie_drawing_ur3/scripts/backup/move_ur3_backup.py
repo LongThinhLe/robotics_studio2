@@ -1,4 +1,85 @@
-  def set_origin_pose(self):
+  def move_with_orientation_constraint(self, target_pose): # problem
+#--------------------------------------------- Current Use
+    
+    self.set_orientation_constraint(tol_x= 0.0005, tol_y= 0.0005, tol_z= 0.0005, weight= 1.0)
+
+    waypoints = []
+    time.sleep(0.5)
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    delta_goal_z = target_pose[2] - current_pose.position.z
+    
+    if delta_goal_z != 0.0: 
+      wpose.position.z += delta_goal_z
+      waypoints.append(copy.deepcopy(wpose))
+
+    delta_goal_x = target_pose[0] - current_pose.position.x
+    delta_goal_y = target_pose[1] - current_pose.position.y
+
+    if delta_goal_x != 0.0:
+      wpose.position.x += delta_goal_x
+      self.set_position_constraint(value_x= wpose.position.x, value_y= 0.0, value_z= 0.0, weight= 0.95)
+    
+    if delta_goal_y != 0.0:
+      wpose.position.y += delta_goal_y
+      self.set_position_constraint(value_x= 0.0, value_y= wpose.position.y, value_z= 0.0, weight= 0.95)
+
+    waypoints.append(copy.deepcopy(wpose))
+    
+    eef_step = 0.001
+    # if (abs(delta_goal_x) < 0.05 and abs(delta_goal_x) != 0.0) or (abs(delta_goal_y) < 0.05 and abs(delta_goal_y) != 0.0):
+    #   eef_step = 0.0001
+    # else: eef_step = 0.01
+
+    # if abs(delta_goal_x) < 0.01 or abs(delta_goal_y) < 0.01: eef_step = 0.0001
+    # else: eef_step = 0.01
+
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+
+    if fraction >= 0.2:
+      self.move_group.execute(plan, wait = True)
+      self.move_group.stop()  
+    else: print("----------------\nFailed to plan the trajectory!\n------------------")
+    
+    del waypoints
+    del wpose
+
+    #------------------------------------
+
+    # waypoints = []
+    # current_pose = self.move_group.get_current_pose().pose
+    # wpose = copy.deepcopy(current_pose)
+
+    # wpose.position.z = target_pose[2]
+    # waypoints.append(copy.deepcopy(wpose))
+
+    # wpose.position.x = target_pose[0]
+    # wpose.position.y = target_pose[1]
+    # wpose.orientation.x = self.start_orientation.x
+    # wpose.orientation.y = self.start_orientation.y
+    # wpose.orientation.z = self.start_orientation.z
+    # wpose.orientation.w = self.start_orientation.w
+    # waypoints.append(copy.deepcopy(wpose))
+
+    # offset_x = wpose.position.x - current_pose.position.x
+    # offset_y = wpose.position.y - current_pose.position.y
+
+    # if offset_x > 0.01 and offset_y > 0.01: eef_step = 0.01
+    # else: eef_step = 0.0001
+
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
+    # if fraction >= 0.2:
+    #   self.move_group.execute(plan, wait = False)
+    #   self.move_group.stop()  
+    # else: print("----------------\nFailed to plan the trajectory!\n------------------")
+    
+    # del waypoints
+    # del wpose 
+
+
+
+def set_origin_pose(self):
     # # Set orientation constraint
     # self.orientation_constraint.header.frame_id = self.move_group.get_planning_frame()
     # self.orientation_constraint.link_name = self.move_group.get_end_effector_link()
