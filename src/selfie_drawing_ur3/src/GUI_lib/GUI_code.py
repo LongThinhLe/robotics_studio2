@@ -383,7 +383,7 @@ class SelfieDrawingApp:
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
         # Set the initial value of the entry widget
-        self.ip_entry.insert(0, "192.168.0.250")
+        self.ip_entry.insert(0, "192.168.1.102") # 192.168.0.250 # ur3e 192.168.1.102
 
         # Create a button to connect
         self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
@@ -583,6 +583,13 @@ class SelfieDrawingApp:
         decrease_y = tk.Button(moving_tcp_frame, text= "Y-", font=("Arial", 16), command= lambda: self.decrease_y_movement())
         decrease_y.pack(side= tk.LEFT, padx= 10)
 
+        increase_z = tk.Button(moving_tcp_frame, text= "Z+", font=("Arial", 16), command= lambda: self.increase_z_movement())
+        increase_z.pack(side= tk.LEFT, padx= 10)
+
+        decrease_z = tk.Button(moving_tcp_frame, text= "Z-", font=("Arial", 16), command= lambda: self.decrease_z_movement())
+        decrease_z.pack(side= tk.LEFT, padx= 10)
+        
+
         # Lable for unit input 
         lbl_unit_mm = tk.Label(moving_tcp_frame, text= "Unit in mm", font =("Arial", 20))
         lbl_unit_mm.pack(side=tk.LEFT)
@@ -613,6 +620,14 @@ class SelfieDrawingApp:
     def decrease_y_movement(self):
         value = float(self.unit_mm_entry.get())
         self.ur3_operate.decrease_y_tcp(value)
+
+    def increase_z_movement(self):
+        value = float(self.unit_mm_entry.get())
+        self.ur3_operate.increase_z_tcp(value)
+
+    def decrease_z_movement(self):
+        value = float(self.unit_mm_entry.get())
+        self.ur3_operate.decrease_z_tcp(value)
 
 
 
@@ -658,6 +673,16 @@ class SelfieDrawingApp:
             offset_frame_gcode_path = self.offset_gcode(frame_gcode_path, self.desire_x_pos, self.desire_y_pos)
             frame_pose_goal_positions = self.gcode2pose(offset_frame_gcode_path)
             self.ur3_operate.set_frame_pose_goals_list(frame_pose_goal_positions)
+
+
+
+            # Import Pose Goal position of Signature
+            signature_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'signature_g23.gcode')
+            offset_signature_gcode_path = self.offset_gcode(signature_gcode_path, self.desire_x_pos, self.desire_y_pos)
+            signature_pose_goal_positions = self.gcode2pose(offset_signature_gcode_path)
+            self.ur3_operate.set_signature_pose_goals_list(signature_pose_goal_positions)
+
+
         else:
             print("No Gcode file selected.")
     
@@ -671,7 +696,7 @@ class SelfieDrawingApp:
         robot_ip = self.ip_entry.get()
 
         # Construct the command to execute
-        command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
+        command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
 
         # Execute the command
         self.process = subprocess.Popen(command)
@@ -723,20 +748,20 @@ class SelfieDrawingApp:
 
     def launch_gazebo(self):
         # Construct the command to execute
-        command = ['roslaunch', 'ur_gazebo', 'ur3_bringup.launch']
+        command = ['roslaunch', 'ur_gazebo', 'ur3e_bringup.launch']
         # Execute the command
         self.process = subprocess.Popen(command) 
     
-    def launch_moveit_planning(self):
-        if self.connection_type.get() == "real": command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
-        else: command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
+    def launch_moveit_planning(self): # Change the robot type here
+        if self.connection_type.get() == "real": command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch"]
+        else: command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
         
         # Execute the command
         self.process = subprocess.Popen(command) 
 
-    def launch_moveit(self):
+    def launch_moveit(self): # Change robot type here
         # Construct the command to execute
-        command = ["roslaunch", "ur3_moveit_config", "moveit_rviz.launch"]
+        command = ["roslaunch", "ur3e_moveit_config", "moveit_rviz.launch"]
         # Execute the command
         self.process = subprocess.Popen(command) 
 
@@ -835,9 +860,9 @@ class SelfieDrawingApp:
             except:
                 print("TCP not ready!")
 
-            self.x_tcp = tcp_pose_x
-            self.y_tcp = tcp_pose_y
-            self.z_tcp = tcp_pose_z
+            self.x_tcp = tcp_pose_x * 1000 # convert m to mm
+            self.y_tcp = tcp_pose_y * 1000
+            self.z_tcp = tcp_pose_z * 1000
             self.x_ori = tcp_ori_x
             self.y_ori = tcp_ori_y
             self.z_ori = tcp_ori_z
@@ -1021,10 +1046,17 @@ class SelfieDrawingApp:
         center_x = (min_x + max_x) / 2
         center_y = (min_y + max_y) / 2
         return center_x, center_y
-    
-    def offset_gcode(self, gcode_path, offset_x, offset_y):
 
-        new_gcode_path = os.path.splitext(gcode_path)[0] + "_offset.gcode"
+
+    def offset_gcode(self, gcode_path, offset_x, offset_y):
+        # Create folder for offset files if it doesn't exist
+        save_folder_offset = os.path.join(self.home_directory, "rs2_ws", "offset_files")
+        if not os.path.exists(save_folder_offset):
+            os.makedirs(save_folder_offset)
+
+        new_gcode_path = os.path.splitext(os.path.basename(gcode_path))[0] + "_offset.gcode"
+        new_gcode_path = os.path.join(save_folder_offset, new_gcode_path)
+
         with open(gcode_path, 'r') as file:
             with open(new_gcode_path, 'w') as new_file:
                 for line in file:
@@ -1040,7 +1072,7 @@ class SelfieDrawingApp:
                                 y_coord = float(part[1:])
                         if x_coord is not None and y_coord is not None:
                             # Apply offset
-                            x_coord += offset_x * 1.08 # Adjust this parameter to modify the frame inside working area
+                            x_coord += offset_x * 1.08  # Adjust this parameter to modify the frame inside working area
                             y_coord += offset_y
                             # Write modified line to new file
                             new_line = f"{parts[0]} X{x_coord:.6f} Y{y_coord:.6f}\n"
@@ -1049,9 +1081,10 @@ class SelfieDrawingApp:
                         # Write non-coordinate lines unchanged
                         new_file.write(line)
 
-        return new_gcode_path
+        return new_gcode_path 
 
-    def gcode2pose(self, new_gcode_path):
+
+    def gcode2pose(self, new_gcode_path): # adjust the Z different
         # Read the Gcode file and extract the pose goal positions
         # gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
         gcode_file_path = new_gcode_path
@@ -1070,7 +1103,7 @@ class SelfieDrawingApp:
                     # Extract X,Y coordinates from the gcode file
                     x = float(line.split('X')[1].split(' ')[0])
                     y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.125
+                    z = 0.13 # ur3: 0.125 #ur3e: 0.13
                     pose_goal_positions.append([x,y,z])
 
         return pose_goal_positions
