@@ -103,12 +103,16 @@ class UR3_Movement(object):
         print(robot.get_current_state())
         print("")
 
-        # Adjust the tolerance of reaching goal !!!!!!!!!!!!!!!!!!!!!!!!
+        # Setting for Movegroup API
         self.move_group.set_goal_tolerance(0.00001)
         self.move_group.set_goal_joint_tolerance(0.000001)
-        self.move_group.set_max_velocity_scaling_factor(0.2)
+        self.move_group.set_max_velocity_scaling_factor(0.5) # 0.5
+        self.move_group.set_max_acceleration_scaling_factor(1)
         self.move_group.set_planning_time(10)  # Adjust the planning time as needed
         self.move_group.set_num_planning_attempts(10)
+        self.move_group.set_planner_id("RRTConnectkConfigDefault")
+        print("\nMove Group Get planner ID ---: ", self.move_group.get_planner_id())
+
 
         self.target_pose = None
         self.move_thread = None
@@ -185,7 +189,7 @@ class UR3_Movement(object):
       # print ("STILL HERE" , self.goal_pose_list)
       if self.goal_pose_list:
         try:
-          time.sleep(0.55)
+          # time.sleep(0.12) # 0.45 # 0.15
           count_goal += 1
           goal = self.goal_pose_list[0][0]
           self.start_movement(goal)
@@ -194,10 +198,9 @@ class UR3_Movement(object):
           # Wait for completion
           self.completeGoal_flag.wait()
           print ("Finish check Goal")
-          # time.sleep(0.2)
           self.goal_pose_list[0].pop(0)
           print ("Pop the firts goal")
-          time.sleep(0.3)
+          time.sleep(0.2) # 0.2 # 0.15
         except:
           print("Finish all goals")
           self.homing_ur3()
@@ -225,19 +228,19 @@ class UR3_Movement(object):
     print("\nContinue drawing Frame............")
     self.goal_pose_list.clear()
     self.goal_pose_list.extend(copy.deepcopy(self.frame_pose_goals_list))
-    time.sleep(2)
+    time.sleep(1)
     self.enable_check_event.set()
   
   def draw_signature(self):
     self.change2Pen3()
-    time.sleep(2)
+    time.sleep(4)
     print("\nWaiting to draw Signature ............")
     self.set_origin_pose()
     print("\nContinue drawing Signature............")
     self.goal_pose_list.clear()
     self.goal_pose_list.extend(copy.deepcopy(self.signature_pose_goals_list))
     print("Self Goal Pose list\n", self.goal_pose_list)
-    time.sleep(2)
+    time.sleep(1)
     self.enable_check_event.set()
 
 
@@ -298,18 +301,23 @@ class UR3_Movement(object):
   def homing_ur3(self):
     self.clear_orientation_constraints()
     self.clear_position_constraints()
-    # joint_deg = [20, -100, -125, -26, -280, 20] #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
-    # joint_goal = np.deg2rad(joint_deg)
     self.start_movement(self.home_joint_angle)
 
   def start_movement(self, target_pose): # THIS FUNCTION IS USED FOR STARTING THE THREAD TO ROBOT GO TO PRESET GOAL
-    start_pose = self.move_group.get_current_pose().pose
-    self.start_orientation = start_pose.orientation
+    # start_pose = self.move_group.get_current_pose().pose
+    # self.start_orientation = start_pose.orientation
     
     self.target_pose = target_pose
     self.completeGoal_flag.clear() # Always clear Complete Goal Flag before moving to goal
     self.move_thread = threading.Thread(target=self._move_to_target) # Start and Stop this thread to run the robot
     self.move_thread.start()
+
+  def continue_drawing(self):
+    self.release_stop_event()
+    if not self.move_thread or not self.move_thread.is_alive():
+        self.move_thread = threading.Thread(target=self._move_to_target)
+        self.move_thread.start()
+
 
   def stop_movement(self): # Stop the robot and stop the thread (join)
     self.stop_flag.set()
@@ -340,14 +348,11 @@ class UR3_Movement(object):
   def clear_orientation_constraints(self):
     # Clear orientation constraint after use
     self.path_constraints.orientation_constraints = []
-    # empty_constraints = Constraints()
-    # self.move_group.set_path_constraints(empty_constraints)
     self.move_group.clear_path_constraints()
 
   def clear_position_constraints(self):
     # Clear position constraint after use
     self.path_constraints.position_constraints = []
-    # self.move_group.set_path_constraints(self.path_constraints)
     self.move_group.clear_path_constraints()
 
   def clear_all_goals(self):
@@ -356,11 +361,11 @@ class UR3_Movement(object):
 
 
 
+  ###################################################################################
 
-  def move_with_orientation_constraint(self, target_pose): # problem
-#--------------------------------------------- Current Use
-    
-    self.set_orientation_constraint(tol_x= 0.0005, tol_y= 0.0005, tol_z= 0.0005, weight= 1.0)
+
+  def move_with_orientation_constraint(self, target_pose):     
+    # self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.0005, weight= 0.99)
 
     waypoints = []
     time.sleep(0.1)
@@ -378,59 +383,31 @@ class UR3_Movement(object):
 
     if delta_goal_x != 0.00:
       wpose.position.x += delta_goal_x
-      # self.set_position_constraint(value_x= wpose.position.x, value_y= 0.0, value_z= 0.0, weight= 0.5)
     
     if delta_goal_y != 0.00:
       wpose.position.y += delta_goal_y
-      # self.set_position_constraint(value_x= 0.0, value_y= wpose.position.y, value_z= 0.0, weight= 0.5)
 
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
     eef_step = self.eef_step_processing(delta_goal_x, delta_goal_y, delta_goal_z)
     
     # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
     (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    
-    # for point in plan.joint_trajectory.points:
-    #   print ("Plan joint timestamp: \n", point.time_from_start)
-    # time.sleep(10)
-    
     self.timestamp_processing(plan)
 
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = True)
-      # time.sleep(0.5)
-      # self.move_group.stop()  
+      self.move_group.execute(plan, wait = True) 
     else: print("----------------\nFailed to plan the trajectory!\n------------------")
     
     del waypoints
     del wpose
     del plan
 
-
-  # def timestamp_processing(self, plan, epsilon = 1e-6):
-  #   """
-  #   Adjusts the time_from_start of waypoints in a trajectory if the last two waypoints have the same time_from_start.
-    
-  #   Args:
-  #       trajectory (RobotTrajectory): The trajectory to adjust.
-  #       epsilon (float): A small value to add to the time_from_start if adjustment is needed.
-  #   """
-  #   if len(plan.joint_trajectory.points) >= 2:
-  #     for i in range(len(plan.joint_trajectory.points) - 1):
-  #       current_point = plan.joint_trajectory.points[i]
-  #       next_point = plan.joint_trajectory.points[i+1]
-
-  #       current_timestamp = current_point.time_from_start.to_sec()
-  #       next_timestamp = next_point.time_from_start.to_sec()
-
-  #       print ("Current Timestamp: ", current_timestamp)
-  #       print ("Next TimeStamp: ", next_timestamp)
-
-  #       if current_timestamp == next_timestamp:
-  #         print ("Current Timestamp: ", current_timestamp)
-  #         print ("Next TimeStamp: ", next_timestamp)
-  #         print ("-----------\nWarning !!! Same TimeStamp \n----------------")           
+        
   def timestamp_processing(self, plan, epsilon=1e-6):
       """
       Adjusts the time_from_start of waypoints in a trajectory if the last two waypoints have the same time_from_start.
@@ -462,13 +439,13 @@ class UR3_Movement(object):
   def eef_step_processing(self, delta_goal_x, delta_goal_y, delta_goal_z): # For Small segments with more accuracy
     # distance < 20mm : eef_step = 0.0075
     # if eef_step > 0.02 cannot go
-    if delta_goal_z > 0.0001:
-      eef_step = 0.012
+    if delta_goal_z > 0.005:
+      eef_step = 0.025 # 0.012 
     else: # If Z is not moving
       distance = math.sqrt(delta_goal_x**2 + delta_goal_y**2)
-      if distance <= 40/1000: eef_step = 0.008 # distance <= 20
-      elif distance > 40/1000 and distance <= 80/1000: eef_step = 0.01 # distance > 20
-      else: eef_step = 0.015
+      if distance <= 30/1000: eef_step = 0.0075 #latest 0.007 # 0.0082 # distance <= 20
+      elif distance > 40/1000 and distance <= 80/1000: eef_step = 0.015 #0.01 # distance > 20
+      else: eef_step = 0.02
 
     print("\nCurrent eef_step: \n", eef_step)
     return eef_step
@@ -507,7 +484,7 @@ class UR3_Movement(object):
           current_position.append(current_z)
           # print ("Current Position: \n", current_position)
           # print ("Target Pose: \n", self.target_pose)
-          if all_close(self.target_pose, current_position, 0.003):
+          if all_close(self.target_pose, current_position, 0.001): #0.002
             self.target_pose = None
             self.completeGoal_flag.set()
             time.sleep(0.05)
@@ -516,7 +493,7 @@ class UR3_Movement(object):
               self.move_group.stop()
             print("\n----------------\nGoal Position is reached !!!\n------------------\n")
             del current_position
-            time.sleep(1)
+            time.sleep(0.05)
             
 
 
@@ -557,7 +534,7 @@ class UR3_Movement(object):
             print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
             self.move_with_orientation_constraint(target_pose)
             self.set_pos_goal_once.set() # Set this flag so that this condition will run one time
-          # else: print("It's stop here") #time.sleep(0.05)
+          # else: print("It's stop here") 
 
       elif isinstance(target_pose, geometry_msgs.msg.Pose): # ----- Pose target
         print("\n--------------------------\nRobot is running... !!!\n--------------------------")
@@ -573,6 +550,37 @@ class UR3_Movement(object):
     print("\n--------------------------\nRobot Stops !!!\n--------------------------")
 
  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #------------------- Changing Pen
   def change2leftpen(self):

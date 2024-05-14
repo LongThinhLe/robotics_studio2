@@ -1,6 +1,83 @@
   def move_with_orientation_constraint(self, target_pose): # problem
 #--------------------------------------------- Current Use
     
+    self.set_orientation_constraint(tol_x= 0.05, tol_y= 0.05, tol_z= 0.005, weight= 0.8)
+
+    waypoints = []
+    time.sleep(0.1)
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    delta_goal_z = target_pose[2] - current_pose.position.z
+    
+    if delta_goal_z != 0.00: 
+      wpose.position.z += delta_goal_z
+      waypoints.append(copy.deepcopy(wpose))
+
+    delta_goal_x = target_pose[0] - current_pose.position.x
+    delta_goal_y = target_pose[1] - current_pose.position.y
+
+    if delta_goal_x != 0.00:
+      wpose.position.x += delta_goal_x
+      # self.set_position_constraint(value_x= wpose.position.x, value_y= 0.0, value_z= 0.0, weight= 0.5)
+    
+    if delta_goal_y != 0.00:
+      wpose.position.y += delta_goal_y
+      # self.set_position_constraint(value_x= 0.0, value_y= wpose.position.y, value_z= 0.0, weight= 0.5)
+
+    waypoints.append(copy.deepcopy(wpose))
+
+    eef_step = self.eef_step_processing(delta_goal_x, delta_goal_y, delta_goal_z)
+    
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
+    
+    # for point in plan.joint_trajectory.points:
+    #   print ("Plan joint timestamp: \n", point.time_from_start)
+    # time.sleep(10)
+    
+    self.timestamp_processing(plan)
+
+    if fraction >= 0.1:
+      self.move_group.execute(plan, wait = True)
+      # time.sleep(0.5)
+      # self.move_group.stop()  
+    else: print("----------------\nFailed to plan the trajectory!\n------------------")
+    
+    del waypoints
+    del wpose
+    del plan
+
+
+
+# def timestamp_processing(self, plan, epsilon = 1e-6):
+  #   """
+  #   Adjusts the time_from_start of waypoints in a trajectory if the last two waypoints have the same time_from_start.
+    
+  #   Args:
+  #       trajectory (RobotTrajectory): The trajectory to adjust.
+  #       epsilon (float): A small value to add to the time_from_start if adjustment is needed.
+  #   """
+  #   if len(plan.joint_trajectory.points) >= 2:
+  #     for i in range(len(plan.joint_trajectory.points) - 1):
+  #       current_point = plan.joint_trajectory.points[i]
+  #       next_point = plan.joint_trajectory.points[i+1]
+
+  #       current_timestamp = current_point.time_from_start.to_sec()
+  #       next_timestamp = next_point.time_from_start.to_sec()
+
+  #       print ("Current Timestamp: ", current_timestamp)
+  #       print ("Next TimeStamp: ", next_timestamp)
+
+  #       if current_timestamp == next_timestamp:
+  #         print ("Current Timestamp: ", current_timestamp)
+  #         print ("Next TimeStamp: ", next_timestamp)
+  #         print ("-----------\nWarning !!! Same TimeStamp \n----------------")     
+
+
+def move_with_orientation_constraint(self, target_pose): # problem
+#--------------------------------------------- Current Use
+    
     self.set_orientation_constraint(tol_x= 0.0005, tol_y= 0.0005, tol_z= 0.0005, weight= 1.0)
 
     waypoints = []

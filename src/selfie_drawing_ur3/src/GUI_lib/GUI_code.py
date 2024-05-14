@@ -295,9 +295,12 @@ class SelfieDrawingApp:
             # Create an entry for IP address input
             self.ip_entry = tk.Entry(ip_frame, font=("Arial", 16), width=15)
             self.ip_entry.pack(side=tk.LEFT, padx=10)
+            
+            # Set the initial value of the entry widget
+            self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102
 
             # Create a button to connect
-            self.connect_button = tk.Button(ip_frame, text="1. Connect", font=("Arial", 16), command= lambda: self.connect_to_robot(), relief="raised", borderwidth=3, highlightthickness=2)
+            self.connect_button = tk.Button(ip_frame, text="1. Connect", font=("Arial", 16), command= lambda: self.connect_to_robot_easy(), relief="raised", borderwidth=3, highlightthickness=2)
             self.connect_button.pack(side=tk.LEFT)
 
             # Create a frame for Robot initialize
@@ -305,7 +308,7 @@ class SelfieDrawingApp:
             initRobot_buttons_frame.grid(row=3, column=0, columnspan=1, sticky="w", pady= 10)
 
             # Create a button for "Init"
-            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize UR3 Robot", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 56, command= lambda: self.init_robot_ur3(), relief="raised", borderwidth=3, highlightthickness=2)
+            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize UR3 Robot", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 56, command= lambda: self.init_robot_ur3_easy(), relief="raised", borderwidth=3, highlightthickness=2)
             initRobot_button.pack(side=tk.LEFT, padx=10)
 
             #--------------------------------------------- Draw Buttons
@@ -314,7 +317,7 @@ class SelfieDrawingApp:
             additional_buttons_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
 
             # Create a button for "Draw!"
-            draw_button = tk.Button(additional_buttons_frame, text="3. Draw!", font=("Arial", 16), bg="#008000", fg="#FFFFFF", width=56, command= lambda: self.start_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
+            draw_button = tk.Button(additional_buttons_frame, text="3. Draw!", font=("Arial", 16), bg="#008000", fg="#FFFFFF", width=56, command= lambda: self.start_drawing_easy(), relief="raised", borderwidth=3, highlightthickness=2)
             draw_button.pack(side=tk.LEFT, padx=(10, 30))
 
             #--------------------------------------------- Stopping Buttons
@@ -326,16 +329,16 @@ class SelfieDrawingApp:
             stop_button = tk.Button(stopping_buttons_frame, text="Stop", font=("Arial", 16), bg="#ff0000", fg="#FFFFFF", width=25, command=lambda: self.stop_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
             stop_button.pack(side=tk.LEFT, padx=(10, 30))
 
-            # Create a button for "Run Test"
-            run_test_button = tk.Button(stopping_buttons_frame, text="Continue", font=("Arial", 16), bg="#0000FF", fg="#FFFFFF", width=25, command=lambda: self.release_stop(), relief="raised", borderwidth=3, highlightthickness=2)
+            # Create a button for "Continue"
+            run_test_button = tk.Button(stopping_buttons_frame, text="Continue", font=("Arial", 16), bg="#0000FF", fg="#FFFFFF", width=25, command=lambda: self.continue_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
             run_test_button.pack(side=tk.LEFT, padx=(10))
             
-            #------------------------------------------- Terminate button
-            # Create a frame for terminate button
+            #------------------------------------------- End drawing button
+            # Create a frame for end drawing button
             terminate_frame = tk.Frame(self.tab_easy_mode)
             terminate_frame.grid(row=6, column=0, columnspan=1, sticky="w", pady= 10)
             # Create a button for termination
-            terminate_button = tk.Button(terminate_frame,text="4. End Drawing", font=("Arial", 16), bg="#000000", fg="#FFFFFF", command= lambda: self.terminate_process(), width=56, relief="raised", borderwidth=3, highlightthickness=2)
+            terminate_button = tk.Button(terminate_frame,text="4. End Drawing", font=("Arial", 16), bg="#000000", fg="#FFFFFF", command= lambda: self.end_drawing(), width=56, relief="raised", borderwidth=3, highlightthickness=2)
             terminate_button.pack(side=tk.LEFT, padx=10)
             
             # Create frame for copy-right text.
@@ -391,7 +394,7 @@ class SelfieDrawingApp:
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
         # Set the initial value of the entry widget
-        self.ip_entry.insert(0, "192.168.1.102") # 192.168.0.250 # ur3e 192.168.1.102
+        self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102
 
         # Create a button to connect
         self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
@@ -514,10 +517,6 @@ class SelfieDrawingApp:
         set_origin_button = tk.Button(set_button_frame, text= "Set Origin", font=("Arial", 16), width= 10, command= lambda: self.set_origin_ur3())
         set_origin_button.pack(side=tk.LEFT, padx=5)
 
-
-        # # Create a button for Importing file Gcode
-        # import_file_gcode_button = tk.Button(set_button_frame, text= "Import Gcode", font=("Arial", 16), width= 10, command= lambda: self.import_gcode())
-        # import_file_gcode_button.pack(side=tk.LEFT, padx=5)
 
         #--------------------------------------------- Draw Buttons
         # Create a frame for drawing buttons
@@ -699,11 +698,42 @@ class SelfieDrawingApp:
         # Get the IP address from the entry widget
         robot_ip = self.ip_entry.get()
 
-        # Construct the command to execute
-        command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
+        if robot_ip == "192.168.0.250":
+            command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
+            self.robot_type = "ur3"
+        elif robot_ip == "192.168.1.104":
+            command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
+            self.robot_type = "ur3e"
+
+        self.robot_status_label.config(text="Connected", bg="green")
 
         # Execute the command
         self.process = subprocess.Popen(command)
+
+    def connect_to_robot_easy(self):
+        # Get the IP address from the entry widget
+        robot_ip = self.ip_entry.get()
+        self.robot_type = "ur3"
+        
+        if robot_ip == "192.168.0.250":
+            command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
+            self.robot_type = "ur3"
+        elif robot_ip == "192.168.1.104":
+            command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
+            self.robot_type = "ur3e"
+
+        self.robot_status_label.config(text="Connected", bg="green")
+
+        # # # Execute the command
+        self.process = subprocess.Popen(command)
+        
+        time.sleep(5)
+        self.launch_moveit_planning_easy(robot_type= self.robot_type)
+        time.sleep(1)
+        print("----------------------\nPlease Run 'ur_robot_driver' on your robot!\n---------------------------------")
+        
+
+
 
     def terminate_process(self):
         # Terminate the process if it exists
@@ -753,21 +783,43 @@ class SelfieDrawingApp:
     def launch_gazebo(self):
         # Construct the command to execute
         command = ['roslaunch', 'ur_gazebo', 'ur3e_bringup.launch']
+        self.robot_type = "ur3e"
+        self.robot_status_label.config(text="Connected", bg="green")
         # Execute the command
         self.process = subprocess.Popen(command) 
     
     def launch_moveit_planning(self): # Change the robot type here
-        if self.connection_type.get() == "real": command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch"]
-        else: command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
+        if self.connection_type.get() == "real": 
+            if self.robot_type == "ur3e":
+                command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch"]
+            elif self.robot_type == "ur3": 
+                command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
+        else: 
+            if self.robot_type == "ur3e":
+                command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
+            elif self.robot_type == "ur3": 
+                command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
+            
         
         # Execute the command
         self.process = subprocess.Popen(command) 
+
+    def launch_moveit_planning_easy(self, robot_type:str):
+        if robot_type == "ur3e":
+            command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch"]
+        elif robot_type == "ur3": 
+            command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
+
+        # Execute the command
+        self.process = subprocess.Popen(command) 
+
 
     def launch_moveit(self): # Change robot type here
         # Construct the command to execute
         command = ["roslaunch", "ur3e_moveit_config", "moveit_rviz.launch"]
         # Execute the command
         self.process = subprocess.Popen(command) 
+
 
     def init_robot_ur3(self):
         # Initialize UR3
@@ -778,6 +830,23 @@ class SelfieDrawingApp:
         time.sleep(0.2)
         # Start update thread Robot TCP
         self.init_update_tcp_thread()
+
+
+    def init_robot_ur3_easy(self):
+        # Initialize UR3
+        self.ur3_operate = UR3_Movement()
+
+        # Start get thread Robot TCP
+        self.ur3_operate.update_robot_tcp_thread()
+        time.sleep(0.2)
+        # Start update thread Robot TCP
+        self.init_update_tcp_thread()
+
+        print("----------------------\nCareful !! Robot will move !!\n---------------------------------")
+        time.sleep(5)
+        self.homing_ur3()
+
+        
     
     def homing_ur3(self):
         # Homing robot with specific joint state
@@ -799,10 +868,38 @@ class SelfieDrawingApp:
         print ("\nSet origin pose")
  
 
-    
-
     def start_drawing(self):
         self.ur3_operate.start_drawing()
+
+
+    def start_drawing_easy(self):
+        self.set_origin_ur3()
+        print("----------------------\nOrigin is set !\n---------------------------------")
+
+        self.clear_all_goals()
+
+        self.open_file_dialog()
+        time.sleep(3)
+        self.import_gcode()
+        print("Robot is ready to Draw !")
+        time.sleep(1)
+        if self.gcode_path:
+            self.start_drawing()
+        else: print("Cannot Start the Robot.")
+
+    
+    def continue_drawing(self):
+        self.ur3_operate.continue_drawing()
+
+
+    def end_drawing(self):
+        self.stop_drawing()
+        time.sleep(1)
+        self.clear_all_goals()
+        time.sleep(1)
+        self.release_stop()
+        self.homing_ur3()
+
 
     def stop_drawing(self):
         self.ur3_operate.stop_movement()
