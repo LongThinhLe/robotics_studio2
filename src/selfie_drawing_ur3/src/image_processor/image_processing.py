@@ -12,6 +12,10 @@ import cairosvg
 import io
 import time
 
+
+
+
+
 class ImageProcessor:
     def __init__(self) -> None:
         # Get the user's home directory
@@ -30,12 +34,21 @@ class ImageProcessor:
             print("No webcam device found.")
             return
         
+        self.enable_camera = True
+        
 
     def update_preview(self,canvas_preview, screen_width, screen_height):
         # Capture a frame
         # ret, frame = self.cap.read()
-        ret = None
-        frame = None
+        # ret = None
+        # frame = None
+
+        if self.enable_camera:
+            ret, frame = self.cap.read()
+        else:
+            ret = None
+            frame = None
+
         if ret:
 
             # Convert the frame from BGR to RGB
@@ -59,8 +72,15 @@ class ImageProcessor:
     def take_picture(self,canvas_capture: Canvas, screen_width:int , screen_height: int):
         # Capture a frame
         # ret, frame = self.cap.read()
-        ret = None
-        frame = None
+        # ret = None
+        # frame = None
+        
+        if self.enable_camera:
+            ret, frame = self.cap.read()
+        else:
+            ret = None
+            frame = None
+
 
         if ret:
             # Convert the frame from BGR to RGB
@@ -208,6 +228,82 @@ class ImageProcessor:
 
 
 
+    def display_trace_outline(self,canvas_traced_outline_image: Canvas):
+        file_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
+        with open(file_path, "rb") as f:
+            svg_data = f.read()
+        
+        png_data = self.svg_to_png(svg_data)
+
+        # Open the PNG image with PIL
+        svg_image = Image.open(png_data)
+
+        # Convert the PIL Image to a PhotoImage
+        photo = ImageTk.PhotoImage(svg_image)
+
+        # Display the image on the canvas
+        canvas_traced_outline_image.create_image(0, 0, anchor=tk.NW, image=photo)
+        canvas_traced_outline_image.image = photo
+
+
+
+
+    def svg_to_png(self,svg_data): # for display purpose
+        png_data = cairosvg.svg2png(bytestring=svg_data)
+        return io.BytesIO(png_data)
+    
+
+
+
+
+
+
+
+
+
+
+    # def trace_outline(self, canvas_traced_outline_image):
+    #     # Check if the captured image exists
+    #     file_path = os.path.join(self.home_directory, "rs2_ws", "img", "captured_picture_rmbg.png")
+    #     if not os.path.exists(file_path):
+    #         print("Image not found.")
+    #         return
+
+    #     output_svg_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
+
+    #     # Read the image
+    #     image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+
+    #     # Apply Canny edge detection
+    #     edges = cv2.Canny(image, 1, 700)
+
+    #     # Find contours
+    #     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    #     # Create SVG object
+    #     svg = svgwrite.Drawing(output_svg_path, profile='tiny')
+
+    #     # Iterate through contours
+    #     for contour in contours:
+    #         # Approximate contour to reduce points
+    #         epsilon = 0.01 * cv2.arcLength(contour, True)
+    #         approx = cv2.approxPolyDP(contour, epsilon, True)
+
+    #         # Convert contour points to SVG format
+    #         points = [(int(point[0][0]), int(point[0][1])) for point in approx]
+    #         svg.add(svg.polyline(points, stroke="black", fill="none"))
+
+    #     # Set the size of the SVG drawing
+    #     svg['width'] = '640px'  # Set the width of the SVG
+    #     svg['height'] = '480px'  # Set the height of the SVG
+
+    #     # Save SVG file
+    #     svg.save()
+
+    #     # Display the processed image
+    #     self.display_trace_outline(canvas_traced_outline_image)
+    #     print("\nSVG image saved:", output_svg_path)
+
 
 
     # def trace_outline(self, canvas_traced_outline_image): # Experiment
@@ -337,77 +433,6 @@ class ImageProcessor:
     #             # Convert contour points to SVG format
     #             points = [(int(point[0][0]), int(point[0][1])) for point in approx]
     #             svg.add(svg.polyline(points, stroke="black", fill="none"))
-
-    #     # Set the size of the SVG drawing
-    #     svg['width'] = '640px'  # Set the width of the SVG
-    #     svg['height'] = '480px'  # Set the height of the SVG
-
-    #     # Save SVG file
-    #     svg.save()
-
-    #     # Display the processed image
-    #     self.display_trace_outline(canvas_traced_outline_image)
-    #     print("\nSVG image saved:", output_svg_path)
-
-
-
-    def display_trace_outline(self,canvas_traced_outline_image: Canvas):
-        file_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
-        with open(file_path, "rb") as f:
-            svg_data = f.read()
-        
-        png_data = self.svg_to_png(svg_data)
-
-        # Open the PNG image with PIL
-        svg_image = Image.open(png_data)
-
-        # Convert the PIL Image to a PhotoImage
-        photo = ImageTk.PhotoImage(svg_image)
-
-        # Display the image on the canvas
-        canvas_traced_outline_image.create_image(0, 0, anchor=tk.NW, image=photo)
-        canvas_traced_outline_image.image = photo
-
-
-
-
-    def svg_to_png(self,svg_data): # for display purpose
-        png_data = cairosvg.svg2png(bytestring=svg_data)
-        return io.BytesIO(png_data)
-    
-
-
-
-    # def trace_outline(self, canvas_traced_outline_image):
-    #     # Check if the captured image exists
-    #     file_path = os.path.join(self.home_directory, "rs2_ws", "img", "captured_picture_rmbg.png")
-    #     if not os.path.exists(file_path):
-    #         print("Image not found.")
-    #         return
-
-    #     output_svg_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
-
-    #     # Read the image
-    #     image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
-
-    #     # Apply Canny edge detection
-    #     edges = cv2.Canny(image, 1, 700)
-
-    #     # Find contours
-    #     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    #     # Create SVG object
-    #     svg = svgwrite.Drawing(output_svg_path, profile='tiny')
-
-    #     # Iterate through contours
-    #     for contour in contours:
-    #         # Approximate contour to reduce points
-    #         epsilon = 0.01 * cv2.arcLength(contour, True)
-    #         approx = cv2.approxPolyDP(contour, epsilon, True)
-
-    #         # Convert contour points to SVG format
-    #         points = [(int(point[0][0]), int(point[0][1])) for point in approx]
-    #         svg.add(svg.polyline(points, stroke="black", fill="none"))
 
     #     # Set the size of the SVG drawing
     #     svg['width'] = '640px'  # Set the width of the SVG

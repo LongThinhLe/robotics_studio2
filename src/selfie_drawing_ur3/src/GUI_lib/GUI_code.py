@@ -701,6 +701,7 @@ class SelfieDrawingApp:
         if robot_ip == "192.168.0.250":
             command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
             self.robot_type = "ur3"
+            
         elif robot_ip == "192.168.1.104":
             command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
             self.robot_type = "ur3e"
@@ -830,6 +831,10 @@ class SelfieDrawingApp:
         time.sleep(0.2)
         # Start update thread Robot TCP
         self.init_update_tcp_thread()
+        self.ur3_operate.set_robot_type(self.robot_type)
+
+
+
 
 
     def init_robot_ur3_easy(self):
@@ -1054,8 +1059,33 @@ class SelfieDrawingApp:
         # Load SVG file
         paths, _ = svg.svg2paths(svg_path)
 
+        # Calculate SVG bounding box dimensions
+        min_x, max_x = float('inf'), float('-inf')
+        min_y, max_y = float('inf'), float('-inf')
+        for path in paths:
+            for segment in path:
+                start = segment.start
+                end = segment.end
+                min_x = min(min_x, start.real, end.real)
+                max_x = max(max_x, start.real, end.real)
+                min_y = min(min_y, start.imag, end.imag)
+                max_y = max(max_y, start.imag, end.imag)
+
+        svg_width = max_x - min_x
+        svg_height = max_y - min_y
+
+        # Desired dimensions in mm
+        desired_width = 180/1000
+        desired_height = 140/1000
+
+        # Calculate scale factors for both dimensions and choose the smaller one to maintain aspect ratio
+        scale_x = desired_width / svg_width
+        scale_y = desired_height / svg_height
+        scale = min(scale_x, scale_y)
+
         # Calculate SVG center
-        svg_center_x, svg_center_y = self.calculate_svg_center(paths)
+        svg_center_x = (min_x + max_x) / 2
+        svg_center_y = (min_y + max_y) / 2
 
         # Desired center point (center coordinate)
         desired_center_x, desired_center_y = 0, 0  # Modify as needed
@@ -1063,9 +1093,6 @@ class SelfieDrawingApp:
         # Calculate displacement
         displacement_x = desired_center_x - svg_center_x
         displacement_y = desired_center_y - svg_center_y
-
-        # Scale factor (adjust as needed)
-        scale = 0.001  # Experiment with this value
 
         save_folder_gcode = os.path.join(self.home_directory, "rs2_ws", "gcode")
         
@@ -1096,9 +1123,10 @@ class SelfieDrawingApp:
                         f.write(f"G0 X{start_x:.10f} Y{start_y:.10f}\n")  # Rapid move to start point
                     f.write(f"G1 X{end_x:.10f} Y{end_y:.10f}\n")  # Linear move to end point
 
-
         print("Generate Gcode Done!")
-        
+
+
+
     def calculate_svg_center(self,paths):
         # Calculate the bounding box of all paths
         min_x, max_x = float('inf'), float('-inf')
@@ -1173,7 +1201,9 @@ class SelfieDrawingApp:
                     # Extract X,Y coordinates from the gcode file
                     x = float(line.split('X')[1].split(' ')[0])
                     y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.13 # ur3: 0.125 #ur3e: 0.13
+                    if self.robot_type == "ur3e":
+                        z = 0.13 # ur3: 0.125 #ur3e: 0.13
+                    else: z = 0.128
                     pose_goal_positions.append([x,y,z])
 
         return pose_goal_positions

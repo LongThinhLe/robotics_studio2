@@ -103,6 +103,9 @@ class UR3_Movement(object):
         print(robot.get_current_state())
         print("")
 
+        # Path constraints
+        self.path_constraints.name = "path_constraint"
+
         # Setting for Movegroup API
         self.move_group.set_goal_tolerance(0.00001)
         self.move_group.set_goal_joint_tolerance(0.000001)
@@ -110,14 +113,20 @@ class UR3_Movement(object):
         self.move_group.set_max_acceleration_scaling_factor(1)
         self.move_group.set_planning_time(10)  # Adjust the planning time as needed
         self.move_group.set_num_planning_attempts(10)
-        self.move_group.set_planner_id("RRTConnectkConfigDefault")
+        self.move_group.set_planner_id("RRTConnect")
         print("\nMove Group Get planner ID ---: ", self.move_group.get_planner_id())
 
+        # print("\nJoint state name: ", self.move_group.get_current_state().joint_state.name)
+
+        self.joint_names_list = self.move_group.get_current_state().joint_state.name
 
         self.target_pose = None
         self.move_thread = None
         self.paused_pose = None
         self.goal_pose_list = [] # List of goal pose
+
+        self.timer_exceed = threading.Event()
+        self.timer_exceed.clear()
 
         self.stop_flag = threading.Event()  # Event to signal stop
         self.stop_flag.clear()
@@ -152,10 +161,25 @@ class UR3_Movement(object):
         print("Error initializing UR3_Movement:", str(e))
 
 
+# ------------------ Get robot type
+  def set_robot_type(self, robot_type):
+    self.robot_type = robot_type
+    self.init_home_pose()
+
+  def init_home_pose(self):
+    if self.robot_type == "ur3e":
+      self.home_joint_angle_original = [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972]
+      self.home_joint_angle = self.home_joint_angle_original
+    else: 
+      self.home_joint_angle_original = [-2.7466, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972]
+      self.home_joint_angle = self.home_joint_angle_original
+
 #------------------- Draw from Gcode file
   def start_drawing(self):
     print("Here are all coordinates \n", self.goal_pose_list)
+    self.set_origin_pose()
     time.sleep(0.5)
+
     # Start the thread drawing
     self.check_goals_thread = threading.Thread(target=self._check_goal_pose_list)
     self.check_goals_thread.start()
@@ -189,18 +213,29 @@ class UR3_Movement(object):
       # print ("STILL HERE" , self.goal_pose_list)
       if self.goal_pose_list:
         try:
-          # time.sleep(0.12) # 0.45 # 0.15
+          time.sleep(0.12) # 0.45 simulation # 0.15
           count_goal += 1
           goal = self.goal_pose_list[0][0]
+
+          self.start_time = time.time()
+
           self.start_movement(goal)
           # Get the first goal from the list
           print (count_goal, ".New Goal: ", goal)
           # Wait for completion
           self.completeGoal_flag.wait()
           print ("Finish check Goal")
-          self.goal_pose_list[0].pop(0)
-          print ("Pop the firts goal")
-          time.sleep(0.2) # 0.2 # 0.15
+
+          if self.timer_exceed.is_set(): # Robot cannot fully reach goal -> run that goal again
+            print("\n----------\nRun Again Current Goal!!!\n----------\n")
+
+            
+          else: # Robot can reach goal -> Pass new goal
+            self.goal_pose_list[0].pop(0)
+            print ("Pop the firts goal")
+
+          time.sleep(0.15) # 0.5 simulation # 0.15 real robot
+
         except:
           print("Finish all goals")
           self.homing_ur3()
@@ -222,13 +257,13 @@ class UR3_Movement(object):
   def draw_frame(self):
     print("\nChanging Pen 2...")
     self.change2Pen2()
-    time.sleep(2)
+    time.sleep(3)
     print("\nWaiting to draw Frame ............")
     self.set_origin_pose()
     print("\nContinue drawing Frame............")
     self.goal_pose_list.clear()
     self.goal_pose_list.extend(copy.deepcopy(self.frame_pose_goals_list))
-    time.sleep(1)
+    time.sleep(0.2)
     self.enable_check_event.set()
   
   def draw_signature(self):
@@ -240,27 +275,45 @@ class UR3_Movement(object):
     self.goal_pose_list.clear()
     self.goal_pose_list.extend(copy.deepcopy(self.signature_pose_goals_list))
     print("Self Goal Pose list\n", self.goal_pose_list)
-    time.sleep(1)
+    time.sleep(0.2)
     self.enable_check_event.set()
 
 
 
-  def set_joint_constraint(self): #### EXPERIMENTAL
+  def set_joint_constraint(self, w1, w2, w3): #### EXPERIMENTAL
+    # Joint name list : ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
+    self.clear_joint_constraints()
 
-    forward_traj_constraints = moveit_msgs.msg.Constraints()
-    forward_traj_constraints.name = "forward_traj_constraints"
-    joint5_constraint = moveit_msgs.msg.JointConstraint(
-      joint_name = "joint5",
-      position = 0,
-      tolerance_above = math.pi/3,
-      tolerance_below = math.pi/3,
-      weight = 0.8,
+    current_joint_state = self.move_group.get_current_state().joint_state
+
+    joint1_constraint = moveit_msgs.msg.JointConstraint(
+      joint_name = "shoulder_pan_joint",
+      position = current_joint_state.position[0],
+      tolerance_above = math.pi/2,
+      tolerance_below = math.pi/2,
+      weight = w1,
     )
 
-    forward_traj_constraints.joint_constraints.extend([joint5_constraint])
-    traj_constraints = moveit_msgs.msg.TrajectoryConstraints()
-    traj_constraints.constraints.append(forward_traj_constraints)
-    self.move_group.set_path_constraints(forward_traj_constraints)
+    joint2_constraint = moveit_msgs.msg.JointConstraint(
+      joint_name = "shoulder_lift_joint",
+      position = current_joint_state.position[1],
+      tolerance_above = math.pi/2,
+      tolerance_below = math.pi/2,
+      weight = w2,
+    )
+
+    joint3_constraint = moveit_msgs.msg.JointConstraint(
+      joint_name = "elbow_joint",
+      position = current_joint_state.position[2],
+      tolerance_above = math.pi/2,
+      tolerance_below = math.pi/2,
+      weight = w3,
+    )
+
+    self.path_constraints.joint_constraints.extend([joint1_constraint, joint2_constraint, joint3_constraint])
+    self.move_group.set_path_constraints(self.path_constraints)
+    # print("Set path constraints in Set Joint constraint: \n", self.move_group.get_path_constraints())
+    # print("\nSelf.path_constraints = \n", self.path_constraints)
 
 
   def set_position_constraint(self, value_x, value_y, value_z, weight = 1.0):
@@ -299,8 +352,7 @@ class UR3_Movement(object):
 
 #-------------------  Movement threading
   def homing_ur3(self):
-    self.clear_orientation_constraints()
-    self.clear_position_constraints()
+    self.clear_all_constrainst()
     self.start_movement(self.home_joint_angle)
 
   def start_movement(self, target_pose): # THIS FUNCTION IS USED FOR STARTING THE THREAD TO ROBOT GO TO PRESET GOAL
@@ -317,7 +369,6 @@ class UR3_Movement(object):
     if not self.move_thread or not self.move_thread.is_alive():
         self.move_thread = threading.Thread(target=self._move_to_target)
         self.move_thread.start()
-
 
   def stop_movement(self): # Stop the robot and stop the thread (join)
     self.stop_flag.set()
@@ -345,6 +396,10 @@ class UR3_Movement(object):
     print ("This is origin orientation: \n", self.start_orientation)
 
 
+  def clear_joint_constraints(self):
+    self.path_constraints.joint_constraints = []
+    self.move_group.clear_path_constraints()
+
   def clear_orientation_constraints(self):
     # Clear orientation constraint after use
     self.path_constraints.orientation_constraints = []
@@ -355,18 +410,24 @@ class UR3_Movement(object):
     self.path_constraints.position_constraints = []
     self.move_group.clear_path_constraints()
 
+
+  def clear_all_constrainst(self):
+    self.clear_joint_constraints()
+    self.clear_orientation_constraints()
+    self.clear_position_constraints()
+
   def clear_all_goals(self):
     self.goal_pose_list.clear()
     self.enable_check_event.clear()
 
 
 
+
   ###################################################################################
+  def move_with_orientation_constraint(self, target_pose):     ## EXPERIMENTAL cannot work because cannot plan
 
-
-  def move_with_orientation_constraint(self, target_pose):     
-    # self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.0005, weight= 0.99)
-
+    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
+    self.clear_orientation_constraints()
     waypoints = []
     time.sleep(0.1)
     current_pose = self.move_group.get_current_pose().pose
@@ -395,17 +456,19 @@ class UR3_Movement(object):
 
     eef_step = self.eef_step_processing(delta_goal_x, delta_goal_y, delta_goal_z)
     
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
     self.timestamp_processing(plan)
 
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = True) 
+      self.move_group.execute(plan, wait = True)
     else: print("----------------\nFailed to plan the trajectory!\n------------------")
     
+    self.move_group.clear_path_constraints()
     del waypoints
     del wpose
     del plan
+
 
         
   def timestamp_processing(self, plan, epsilon=1e-6):
@@ -456,8 +519,8 @@ class UR3_Movement(object):
 ########################################################
   def _check_goal_reached(self): 
     rate = rospy.Rate(10)
+
     while True:
-      
       # ---------------------------- CHECK IF THE GOAL IS REACHED -> USING SELF.TARGET_POSE
       if np.all(self.target_pose):
         # print ("Check length self.target pose = ", len(self.target_pose))
@@ -484,16 +547,33 @@ class UR3_Movement(object):
           current_position.append(current_z)
           # print ("Current Position: \n", current_position)
           # print ("Target Pose: \n", self.target_pose)
-          if all_close(self.target_pose, current_position, 0.001): #0.002
+
+          # Calculate elapsed time
+          elapsed_time = time.time() - self.start_time
+          print("Elapsed time = ", elapsed_time)
+          if all_close(self.target_pose, current_position, 0.001): # REAL: 0.001 / SIM: 0.002
             self.target_pose = None
             self.completeGoal_flag.set()
             time.sleep(0.05)
+            self.timer_exceed.clear()
             if self.move_thread.is_alive():
               self.move_thread.join()
               self.move_group.stop()
             print("\n----------------\nGoal Position is reached !!!\n------------------\n")
             del current_position
             time.sleep(0.05)
+          
+          elif elapsed_time > 5:
+              self.target_pose = None
+              self.completeGoal_flag.set()
+              time.sleep(0.05)
+              self.timer_exceed.set()
+              if self.move_thread.is_alive():
+                self.move_thread.join()
+                self.move_group.stop()
+              print("\n----------------\nTimer Exceeds !!!\n------------------\n")
+              del current_position
+              time.sleep(0.5)
             
 
 
@@ -584,8 +664,7 @@ class UR3_Movement(object):
 
 #------------------- Changing Pen
   def change2leftpen(self):
-    self.clear_position_constraints()
-    self.clear_orientation_constraints()
+    self.clear_all_constrainst()
 
     current_joint = copy.deepcopy(self.move_group.get_current_joint_values())
     print("\nCurrent Joint = \n", current_joint)
@@ -601,8 +680,7 @@ class UR3_Movement(object):
 
 
   def change2rightpen(self):
-    self.clear_position_constraints()
-    self.clear_orientation_constraints()
+    self.clear_all_constrainst()
 
     current_joint = copy.deepcopy(self.move_group.get_current_joint_values())
     print("\nCurrent Joint = \n", current_joint)
@@ -618,8 +696,7 @@ class UR3_Movement(object):
 
 
   def change2Pen1(self):
-    self.clear_position_constraints()
-    self.clear_orientation_constraints()
+    self.clear_all_constrainst()
     current_joint = copy.deepcopy(self.home_joint_angle)
     current_joint[-1] = math.radians(20)
 
@@ -627,8 +704,7 @@ class UR3_Movement(object):
 
 
   def change2Pen2(self):
-    self.clear_position_constraints()
-    self.clear_orientation_constraints()
+    self.clear_all_constrainst()
     current_joint = copy.deepcopy(self.home_joint_angle)
     current_joint[-1] = math.radians(110)
 
@@ -636,8 +712,7 @@ class UR3_Movement(object):
 
   
   def change2Pen3(self):
-    self.clear_position_constraints()
-    self.clear_orientation_constraints()
+    self.clear_all_constrainst()
     current_joint = copy.deepcopy(self.home_joint_angle)
     current_joint[-1] = math.radians(-70)
 
