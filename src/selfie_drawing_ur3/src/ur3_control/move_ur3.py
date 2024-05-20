@@ -140,13 +140,16 @@ class UR3_Movement(object):
         self.enable_check_event = threading.Event() # Flag for checking goal
         self.enable_check_event.set()
 
-        self.check_goal_reached_thread = threading.Thread(target=self._check_goal_reached)
-        self.check_goal_reached_thread.start()
+        # self.goalReach = threading.Event()
+        # self.goalReach.clear()
+
+        # self.check_goal_reached_thread = threading.Thread(target=self._check_goal_reached)
+        # self.check_goal_reached_thread.start()
 
         # This joint angle is perfect for 150mm Square without self-collision: [0.3438, -1.7949, -2.1418, -0.4759, -4.8844, -5.9389]
         # ur3e : [-1.122, -1.7949, -2.1418, -0.4759, -4.8844, 0.349]
         # ur3e further: [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972]
-        self.home_joint_angle_original = [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972] # ur3[0.3438, -1.7949, -2.1418, -0.4759, -4.8844, 0.349] #[20, -100, -125, -26, -280, 20]  #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
+        self.home_joint_angle_original = [-1.1810186545001429, -1.9437056980528773, -1.9343211650848389, -0.5028556150249024, -4.868577424679891, 0.34874417972]# ur3e [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972] # ur3[0.3438, -1.7949, -2.1418, -0.4759, -4.8844, 0.349] #[20, -100, -125, -26, -280, 20]  #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
         # self.home_joint_angle_original = np.deg2rad(self.home_joint_angle_original)
 
         self.home_joint_angle = self.home_joint_angle_original # ur3[0.3438, -1.7949, -2.1418, -0.4759, -4.8844, 0.349] # [20, -100, -125, -26, -280, 20]
@@ -168,13 +171,554 @@ class UR3_Movement(object):
 
   def init_home_pose(self):
     if self.robot_type == "ur3e":
-      self.home_joint_angle_original = [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972]
+      self.home_joint_angle_original = [-1.1810186545001429, -1.9437056980528773, -1.9343211650848389, -0.5028556150249024, -4.868577424679891, 0.34874417972]# [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972]
       self.home_joint_angle = self.home_joint_angle_original
     else: 
       self.home_joint_angle_original = [-2.7466, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972]
       self.home_joint_angle = self.home_joint_angle_original
 
-#------------------- Draw from Gcode file
+
+
+
+
+
+
+#------------------- CHECKING THREADING
+  def _check_goal_pose_list(self): # MULTIPLE GOAL CHATGPT
+      """
+      Check if there is a goal pose/joint in self.goal_pose_list.
+      If a goal exists, set it as self.target_pose for robot movement.
+      If the goal is a pose, convert it to a numpy array before setting.
+      """
+      rate = rospy.Rate(10)
+      # print("Go into the thread check goal")
+      count_goal = 0
+      continuous_goals = []
+
+      while self.enable_check_event.is_set():
+          if self.goal_pose_list:
+              try:
+                  # time.sleep(0.12) # 0.45 simulation # 0.15
+                  count_goal += 1
+                  print("\nNumber of goals left: ", len(self.goal_pose_list[0]))
+                  count_continuous_goal = 0
+
+                  if len(self.goal_pose_list[0]) > 1:
+                      current_z_goal = self.goal_pose_list[0][0][2] # Z value in 1 coordinate
+                      next_z_goal = self.goal_pose_list[0][1][2]
+
+                      print("Current z goal =", current_z_goal)
+                      print("Next_z_Goal = ", next_z_goal)
+
+                      if not self.timer_exceed.is_set():
+                          print("Go Here 1")
+                          if current_z_goal != next_z_goal: # if there is a change in Z
+                              run_goal = self.goal_pose_list[0][0] # run single goal
+                              print("Run goal 1 =\n", run_goal)
+
+                          else: # if there is no change in Z
+                              count_continuous_goal = 0
+                              print("Go Here 2")
+
+                              for i in range(len(self.goal_pose_list[0]) - 1):
+                                  current_z_goal = self.goal_pose_list[0][i][2]
+                                  next_z_goal = self.goal_pose_list[0][i + 1][2]
+
+                                  if current_z_goal == next_z_goal: # Run through pose goal list: if Z is not change, put the current goal in continuous goal
+                                      continuous_goals.append(self.goal_pose_list[0][i])
+                                      count_continuous_goal += 1
+                                      print("Count continue goal = \n", count_continuous_goal)
+
+                                  else:
+                                      continuous_goals.append(self.goal_pose_list[0][i])
+                                      count_continuous_goal += 1
+                                      run_goal = continuous_goals.copy()
+                                      print("Run goal 2 =\n", run_goal)
+                                      continuous_goals.clear()
+                                      break
+
+                                  if i == len(self.goal_pose_list[0]) - 2: # If there is no Z change until last position
+                                      run_goal = continuous_goals.copy()
+                                      print("Run goal 3 =\n", run_goal)
+                                      continuous_goals.clear()
+                                      break
+                      else: # Run again previous goal
+                          run_goal = self.goal_pose_list[0][0] # run again the previous goal because it can not reach
+                          print("Run goal 4 =\n", run_goal)
+                  else: # if the goal pose list has only 2 coordinate left:
+                      run_goal = self.goal_pose_list[0][0]
+                      print("Run goal 5 =\n", run_goal)
+
+                  print("Run goal 6 =\n", run_goal)
+                  self.start_time = time.time()
+                  self.start_movement(run_goal) # send target_pose here: single list or multiple list here
+
+                  # Get the first goal from the list
+                  print(count_goal, ".New Goal: ", run_goal)
+                  # Wait for completion
+                  self.completeGoal_flag.wait()
+                  print("Finish check Goal")
+
+                  if self.timer_exceed.is_set(): # Robot cannot fully reach goal -> run that goal again
+                      print("\n----------\nRun Again Current Goal!!!\n----------\n")
+
+                  else: # Robot can reach goal -> Pass new goal
+                      if count_continuous_goal > 0: # After putting all the consecutive goals to run, pop them
+                          for i in range(count_continuous_goal):
+                              goal_popped = self.goal_pose_list[0].pop(0)
+                              print("Pop goal:  ", goal_popped)
+                      else:
+                          first_goal_popped = self.goal_pose_list[0].pop(0)
+                          print("Pop the first goal ONLY: ", first_goal_popped)
+
+                  time.sleep(0.05) # 0.5 simulation # 0.15 real robot
+
+              except Exception as e:
+                  print("Exception occurred: ", str(e))
+                  print("Finish all goals")
+                  self.homing_ur3()
+                  self.step_to_draw += 1
+
+                  if self.step_to_draw == 1:
+                      self.draw_frame()
+                  elif self.step_to_draw == 2:
+                      self.draw_signature()
+                  elif self.step_to_draw == 3:
+                      print("Enjoy Drawing !!!")
+                      self.step_to_draw = 0
+                      self.enable_check_event.clear()
+
+          rate.sleep()
+
+  # def _check_goal_pose_list(self): # MULTIPLE GOAL
+  #   """
+  #   Check if there is a goal pose/joint in self.goal_pose_list.
+  #   If a goal exists, set it as self.target_pose for robot movement.
+  #   If the goal is a pose, convert it to a numpy array before setting.
+  #   """
+  #   rate = rospy.Rate(10)
+  #   print ("Go into the thread check goal")
+  #   count_goal = 0
+  #   continuous_goals = []
+
+  #   while self.enable_check_event.is_set():
+  #     if self.goal_pose_list:
+  #       try:
+  #         time.sleep(0.12) # 0.45 simulation # 0.15
+  #         count_goal += 1
+  #         # goal = self.goal_pose_list[0][0]
+
+  #         print("Length: ", len(self.goal_pose_list[0]))
+  #         time.sleep(2)
+
+  #         if len(self.goal_pose_list[0]) > 1:
+  #           current_z_goal = self.goal_pose_list[0][0][2] # Z value in 1 coordinate
+  #           next_z_goal = self.goal_pose_list[0][1][2]
+
+  #           print("Current z goal =", current_z_goal)
+  #           print("Next_z_Goal = ", next_z_goal)
+  #           time.sleep(2)
+
+  #           if not self.timer_exceed.is_set():
+  #             print("Go Here 1")
+  #             if current_z_goal != next_z_goal: # if there is a change in Z
+  #               run_goal = self.goal_pose_list[0][0] # run single goal
+  #               print("Run goal 1 =\n", run_goal)
+
+  #             else: # if there is no change in Z
+  #               count_continuous_goal = 0
+  #               print("Go Here 2")
+
+  #               for i in range(len(self.goal_pose_list[0]-1)):
+  #                 current_z_goal = self.goal_pose_list[i][2]
+  #                 next_z_goal = self.goal_pose_list[i+1][2]
+
+  #                 if current_z_goal == next_z_goal: # Run through pose goal list: if Z is not change, put the current goal in continuous goal
+  #                   continuous_goals.append(self.goal_pose_list[0][i])
+  #                   count_continuous_goal += 1
+  #                   print("Count continue goal = \n", count_continuous_goal)
+                  
+  #                 else:
+  #                   run_goal = continuous_goals.copy()
+  #                   print("Run goal 2 =\n", run_goal)
+  #                   continuous_goals.clear()
+  #                   break
+
+  #                 if i == len(self.goal_pose_list[0]) - 2:
+  #                   run_goal = continuous_goals.copy()
+  #                   print("Run goal 3 =\n", run_goal)
+  #                   continuous_goals.clear()
+  #                   break
+  #           else: # Run again previous goal
+  #             run_goal = self.goal_pose_list[0][0] # run again the previous goal because it can not reach
+  #             print("Run goal 4 =\n", run_goal)
+  #         else: # if the goal pose list has only 2 coordinate left:
+  #           run_goal = self.goal_pose_list[0][0]
+  #           print("Run goal 5 =\n", run_goal)
+
+  #         if count_continuous_goal > 0: # After put all the consecutive goals to run, pop them
+  #           for i in range(count_continuous_goal):
+  #             self.goal_pose_list[0].pop(0)
+  #             print("cc here ", i)
+
+
+  #         print("Run goal 6 =\n", run_goal)
+  #         time.sleep(10)
+  #         self.start_time = time.time()
+  #         self.start_movement(run_goal) # send target_pose here: single list or multiple list here
+
+  #         # Get the first goal from the list
+  #         print (count_goal, ".New Goal: ", run_goal)
+  #         # Wait for completion
+  #         self.completeGoal_flag.wait()
+  #         print ("Finish check Goal")
+
+  #         if self.timer_exceed.is_set(): # Robot cannot fully reach goal -> run that goal again
+  #           print("\n----------\nRun Again Current Goal!!!\n----------\n")
+
+  #         else: # Robot can reach goal -> Pass new goal
+  #           self.goal_pose_list[0].pop(0)
+  #           print ("Pop the firts goal")
+
+  #         time.sleep(0.15) # 0.5 simulation # 0.15 real robot
+
+  #       except:
+  #         print("Finish all goals")
+  #         self.homing_ur3()
+  #         self.step_to_draw += 1
+          
+  #         if self.step_to_draw == 1:
+  #           self.draw_frame()
+  #         elif self.step_to_draw == 2:
+  #           self.draw_signature()
+  #         elif self.step_to_draw == 3:
+  #           print("Enjoy Drawing !!!")
+  #           self.step_to_draw = 0
+  #           self.enable_check_event.clear()
+          
+
+  #     rate.sleep()
+
+
+
+
+
+##---------------------------------- MOVE TO TARGET
+
+  def _move_to_target(self): # MULTIPLE GOALS
+    rate = rospy.Rate(10)  # Adjust the rate based on your requirements
+    print ("\nGo into move to target thread \n")
+    target_pose = self.target_pose
+    self.set_pos_goal_once.clear() 
+
+    while not self.stop_flag.is_set() and not self.completeGoal_flag.is_set(): 
+      if isinstance(target_pose, list) and all(isinstance(item, list) for item in target_pose):  # Check if a target_pose has sublists to move continuously
+        # print("Move multiple targets !")
+        self.move_multiple_waypoints(target_pose)
+      else:
+        # print("Move single target !")
+        self.move_single_target(target_pose)
+
+
+      rate.sleep()  # Ensure that the loop runs at a specific rate INSIDE THE LOOP WHILE
+
+    print("\n--------------------------\nRobot Stops !!!\n--------------------------")
+
+
+  def move_single_target(self, target_pose):  ## FIX PLAN CARTERSIAN AND EXECUTE PLAN INSTEAD OF STATIC JOINT ANGLES
+    # ---------------------------- SET PLAN THE TARGET POSE COPY ONLY ONCE
+    if np.all(target_pose):
+      if len(target_pose) == 6:  # ---- Joint angles
+        if not self.set_pos_goal_once.is_set():
+          print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
+          # ----- Move to joint target
+          plan = self.move_group.go(target_pose, wait=True)
+          # if plan:
+          self.move_group.stop()  # Stop any ongoing movement
+          target_pose = None  # Reset target pose after movement
+          self.completeGoal_flag.set()
+          self.set_pos_goal_once.set() # Set this flag so that this condition will run one time
+
+      elif len(target_pose) == 3: # ----- Gcode X,Y,Z
+        if not self.set_pos_goal_once.is_set():
+          print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
+          self.move_single_waypoints(target_pose)
+          self.set_pos_goal_once.set() # Set this flag so that this condition will run one time
+        # else: print("It's stop here") 
+
+    elif isinstance(target_pose, geometry_msgs.msg.Pose): # ----- Pose target
+      print("\n--------------------------\nRobot is running... !!!\n--------------------------")
+      # ----- Move to pose target
+      self.move_group.set_pose_target(target_pose)
+      plan = self.move_group.go(wait=False)
+      if plan:
+        self.move_group.stop()
+        target_pose = None
+
+
+  def move_multiple_waypoints(self, target_poses):
+      self.set_joint_constraint(0.7, 0.7, 0.7)
+      self.clear_orientation_constraints()
+      waypoints = []
+      # time.sleep(0.1)
+      current_pose = self.move_group.get_current_pose().pose
+      wpose = copy.deepcopy(current_pose)
+
+      delta_goal_z = target_poses[0][2] - current_pose.position.z # target_poses[0][2] = the first Z value to lower the Pen
+
+      if delta_goal_z != 0.00: 
+        wpose.position.z += delta_goal_z
+        waypoints.append(copy.deepcopy(wpose))
+
+      for target_pose in target_poses:
+          delta_goal_x = target_pose[0] - wpose.position.x
+          delta_goal_y = target_pose[1] - wpose.position.y
+
+          if delta_goal_x != 0.00:
+              wpose.position.x += delta_goal_x
+          
+          if delta_goal_y != 0.00:
+              wpose.position.y += delta_goal_y
+
+          wpose.orientation.x = self.start_orientation.x
+          wpose.orientation.y = self.start_orientation.y
+          wpose.orientation.z = self.start_orientation.z
+          wpose.orientation.w = self.start_orientation.w
+          waypoints.append(copy.deepcopy(wpose))
+
+      # eef_step = self.eef_step_processing(delta_goal_x, delta_goal_y, delta_goal_z)
+      
+      (plan, fraction) = self.move_group.compute_cartesian_path(
+          waypoints=waypoints, eef_step=0.01, jump_threshold=0.0, path_constraints=self.path_constraints
+      )
+      self.timestamp_processing(plan)
+
+      if fraction >= 0.1:
+          result = self.move_group.execute(plan, wait = True)
+      else:
+          print("----------------\nFailed to plan the trajectory!\n------------------")
+
+      if result:
+        self.completeGoal_flag.set()
+        print("\n----------------\nComplete Flag is set !!!\n------------------\n")
+
+
+      self.move_group.clear_path_constraints()
+      del waypoints
+      del wpose
+      del plan
+
+
+
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+ #------------------------------------------- DISCRETE GOAL FUNCTION
+
+
+#   def _check_goal_pose_list(self): # DISCRETE GOAL
+#     """
+#     Check if there is a goal pose/joint in self.goal_pose_list.
+#     If a goal exists, set it as self.target_pose for robot movement.
+#     If the goal is a pose, convert it to a numpy array before setting.
+#     """
+#     rate = rospy.Rate(10)
+#     print ("Go into the thread check goal")
+#     count_goal = 0
+#     while self.enable_check_event.is_set():
+#       if self.goal_pose_list:
+#         try:
+#           time.sleep(0.1) # 0.45 simulation # 0.15
+#           count_goal += 1
+#           goal = self.goal_pose_list[0][0]
+
+#           # self.start_time = time.time()
+
+#           self.start_movement(goal)
+
+#           # Get the first goal from the list
+#           print (count_goal, ".New Goal: ", goal)
+#           # Wait for completion
+
+#           self.completeGoal_flag.wait()
+#           print ("Finish check Goal")
+
+#           if self.timer_exceed.is_set(): # Robot cannot fully reach goal -> run that goal again
+#             print("\n----------\nRun Again Current Goal!!!\n----------\n")
+#           else: # Robot can reach goal -> Pass new goal
+#             self.goal_pose_list[0].pop(0)
+#             print ("Pop the firts goal")
+
+#           # time.sleep(0.15) # 0.5 simulation # 0.15 real robot
+
+#         except:
+#           print("Finish all goals")
+#           self.homing_ur3()
+#           self.step_to_draw += 1
+          
+#           if self.step_to_draw == 1:
+#             self.draw_frame()
+#           elif self.step_to_draw == 2:
+#             self.draw_signature()
+#           elif self.step_to_draw == 3:
+#             print("Enjoy Drawing !!!")
+#             self.step_to_draw = 0
+#             self.enable_check_event.clear()
+          
+
+#       rate.sleep()
+
+
+
+
+#   def _move_to_target(self):  # DISCRETE GOAL
+#     rate = rospy.Rate(10)  # Adjust the rate based on your requirements
+#     print ("\nGo into move to target thread \n")
+#     target_pose = self.target_pose
+#     self.set_pos_goal_once.clear() 
+
+#     while not self.stop_flag.is_set() and not self.completeGoal_flag.is_set():
+#       # ---------------------------- SET PLAN THE TARGET POSE COPY ONLY ONCE
+#       if np.all(target_pose): # ---- Joint angles
+#         if len(target_pose) == 6:
+#           if not self.set_pos_goal_once.is_set(): # NEW HERE, DELETE IF NEED
+#             print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
+#             # ----- Move to joint target
+#             plan = self.move_group.go(target_pose, wait=True)
+#             if plan:
+#               self.move_group.stop()  # Stop any ongoing movement
+#               target_pose = None  # Reset target pose after movement
+#               self.completeGoal_flag.set()
+
+#         elif len(target_pose) == 3: # ----- Gcode X,Y,Z
+#           if not self.set_pos_goal_once.is_set():
+#             print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
+#             self.move_single_waypoints(target_pose)
+#             self.set_pos_goal_once.set() # Set this flag so that this condition will run one time
+#           # else: print("It's stop here") 
+
+#       elif isinstance(target_pose, geometry_msgs.msg.Pose): # ----- Pose target
+#         print("\n--------------------------\nRobot is running... !!!\n--------------------------")
+#         # ----- Move to pose target
+#         self.move_group.set_pose_target(target_pose)
+#         plan = self.move_group.go(wait=True)
+#         if plan:
+#           self.move_group.stop()
+#           target_pose = None
+
+#       rate.sleep()  # Ensure that the loop runs at a specific rate INSIDE THE LOOP WHILE
+
+#     print("\n--------------------------\nRobot Stops !!!\n--------------------------")
+
+
+
+# #----------------------------------- MOVING FUNCTION THREADING
+  def move_single_waypoints(self, target_pose):    # DISCRETE GOAL KEEP THIS ALWAYS ON
+
+    self.set_joint_constraint(0.7, 0.7, 0.7)
+    self.clear_orientation_constraints()
+    waypoints = []
+    # time.sleep(0.1)
+    current_pose = self.move_group.get_current_pose().pose
+    wpose = copy.deepcopy(current_pose)
+
+    delta_goal_z = target_pose[2] - current_pose.position.z
+    
+    if delta_goal_z != 0.00: 
+      wpose.position.z += delta_goal_z
+      waypoints.append(copy.deepcopy(wpose))
+
+    delta_goal_x = target_pose[0] - current_pose.position.x
+    delta_goal_y = target_pose[1] - current_pose.position.y
+
+    if delta_goal_x != 0.00:
+      wpose.position.x += delta_goal_x
+    
+    if delta_goal_y != 0.00:
+      wpose.position.y += delta_goal_y
+
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
+    waypoints.append(copy.deepcopy(wpose))
+
+    eef_step = self.eef_step_processing(delta_goal_x, delta_goal_y, delta_goal_z)
+    
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
+    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
+    self.timestamp_processing(plan)
+
+    if fraction >= 0.1:
+      result = self.move_group.execute(plan, wait = True)
+    else: print("----------------\nFailed to plan the trajectory!\n------------------")
+    
+    if result:
+      self.completeGoal_flag.set()
+      print("\n----------------\nComplete Flag is set !!!\n------------------\n")
+
+    self.move_group.clear_path_constraints()
+    del waypoints
+    del wpose
+    del plan
+
+
+ #------------------------------------------- END DISCRETE GOAL FUNCTION
+
+
+# --------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+  #-------- Process timestamp and eef_step for path planning failure
+  def timestamp_processing(self, plan, epsilon=1e-6):
+      """
+      Adjusts the time_from_start of waypoints in a trajectory if the last two waypoints have the same time_from_start.
+      
+      Args:
+          plan (RobotTrajectory): The trajectory to adjust.
+          epsilon (float): A small value to add to the time_from_start if adjustment is needed.
+      """
+      if len(plan.joint_trajectory.points) >= 2:
+          new_trajectory_points = [plan.joint_trajectory.points[0]]  # Initialize with the first point
+
+          for i in range(1, len(plan.joint_trajectory.points)):
+              current_point = plan.joint_trajectory.points[i]
+              previous_point = plan.joint_trajectory.points[i - 1]
+
+              current_timestamp = current_point.time_from_start.to_sec()
+              previous_timestamp = previous_point.time_from_start.to_sec()
+
+              if current_timestamp == previous_timestamp == 0.0:
+                  # Skip adding the current point if both current and previous timestamps are 0
+                  continue
+
+              new_trajectory_points.append(current_point)
+
+          # Update the trajectory points with the new list
+          plan.joint_trajectory.points = new_trajectory_points
+
+
+  def eef_step_processing(self, delta_goal_x, delta_goal_y, delta_goal_z): # For Small segments with more accuracy
+    # distance < 20mm : eef_step = 0.0075
+    # if eef_step > 0.02 cannot go
+    if delta_goal_z > 0.005:
+      eef_step = 0.025 # 0.012 
+    else: # If Z is not moving
+      distance = math.sqrt(delta_goal_x**2 + delta_goal_y**2)
+      if distance <= 30/1000: eef_step = 0.0075 #latest 0.007 # 0.0082 # distance <= 20
+      elif distance > 40/1000 and distance <= 80/1000: eef_step = 0.015 #0.01 # distance > 20
+      else: eef_step = 0.02
+
+    print("\nCurrent eef_step: \n", eef_step)
+    return eef_step
+
+#### from 0.008 to 0.015
+
+
+#----------------------------- DRAWING FUNCTIONS
+
   def start_drawing(self):
     print("Here are all coordinates \n", self.goal_pose_list)
     self.set_origin_pose()
@@ -199,60 +743,6 @@ class UR3_Movement(object):
     self.signature_pose_goals_list.clear()
     self.signature_pose_goals_list.append(signature_pose_goal_positions)
     print ("\nSignature Ready !")
-
-  def _check_goal_pose_list(self):
-    """
-    Check if there is a goal pose/joint in self.goal_pose_list.
-    If a goal exists, set it as self.target_pose for robot movement.
-    If the goal is a pose, convert it to a numpy array before setting.
-    """
-    rate = rospy.Rate(10)
-    print ("Go into the thread check goal")
-    count_goal = 0
-    while self.enable_check_event.is_set():
-      # print ("STILL HERE" , self.goal_pose_list)
-      if self.goal_pose_list:
-        try:
-          time.sleep(0.12) # 0.45 simulation # 0.15
-          count_goal += 1
-          goal = self.goal_pose_list[0][0]
-
-          self.start_time = time.time()
-
-          self.start_movement(goal)
-          # Get the first goal from the list
-          print (count_goal, ".New Goal: ", goal)
-          # Wait for completion
-          self.completeGoal_flag.wait()
-          print ("Finish check Goal")
-
-          if self.timer_exceed.is_set(): # Robot cannot fully reach goal -> run that goal again
-            print("\n----------\nRun Again Current Goal!!!\n----------\n")
-
-            
-          else: # Robot can reach goal -> Pass new goal
-            self.goal_pose_list[0].pop(0)
-            print ("Pop the firts goal")
-
-          time.sleep(0.15) # 0.5 simulation # 0.15 real robot
-
-        except:
-          print("Finish all goals")
-          self.homing_ur3()
-          self.step_to_draw += 1
-          
-          if self.step_to_draw == 1:
-            self.draw_frame()
-          elif self.step_to_draw == 2:
-            self.draw_signature()
-          elif self.step_to_draw == 3:
-            print("Enjoy Drawing !!!")
-            self.step_to_draw = 0
-            self.enable_check_event.clear()
-          
-
-      rate.sleep()
-
 
   def draw_frame(self):
     print("\nChanging Pen 2...")
@@ -279,6 +769,78 @@ class UR3_Movement(object):
     self.enable_check_event.set()
 
 
+
+#------------------------------ BUTTONS FUNCTIONS
+#-------------------  Movement threading
+  def homing_ur3(self):
+    self.clear_all_constrainst()
+    self.start_movement(self.home_joint_angle)
+
+  def start_movement(self, target_pose): # THIS FUNCTION IS USED FOR STARTING THE THREAD TO ROBOT GO TO PRESET GOAL
+    self.target_pose = target_pose
+    self.completeGoal_flag.clear() # Always clear Complete Goal Flag before moving to goal
+    self.move_thread = threading.Thread(target=self._move_to_target) # Start and Stop this thread to run the robot
+    self.move_thread.start()
+
+  def continue_drawing(self):
+    self.release_stop_event()
+    if not self.move_thread or not self.move_thread.is_alive():
+        self.move_thread = threading.Thread(target=self._move_to_target)
+        self.move_thread.start()
+
+  def stop_movement(self): # Stop the robot and stop the thread (join)
+    self.stop_flag.set()
+    if self.move_thread:
+        self.move_thread.join()
+        self.move_group.stop()
+
+  def release_stop_event(self):
+    # Reset the stop flag after homing
+    print("\n----------Clear Stop Flag----------\n")
+    self.stop_flag.clear()
+
+  def set_new_home(self):
+    self.home_joint_angle = copy.deepcopy(self.move_group.get_current_joint_values())
+
+  def reset_home(self):
+    self.home_joint_angle = copy.deepcopy(self.home_joint_angle_original)
+
+  def set_origin_pose(self):
+    self.set_orientation_constraint(0.0005, 0.0005, 0.0005)
+    self.target_pose = None
+    start_pose = self.move_group.get_current_pose().pose
+    self.start_orientation = start_pose.orientation
+    print ("This is origin orientation: \n", self.start_orientation)
+
+  def clear_joint_constraints(self):
+    self.path_constraints.joint_constraints = []
+    self.move_group.clear_path_constraints()
+
+  def clear_orientation_constraints(self):
+    # Clear orientation constraint after use
+    self.path_constraints.orientation_constraints = []
+    self.move_group.clear_path_constraints()
+
+  def clear_position_constraints(self):
+    # Clear position constraint after use
+    self.path_constraints.position_constraints = []
+    self.move_group.clear_path_constraints()
+
+  def clear_all_constrainst(self):
+    self.clear_joint_constraints()
+    self.clear_orientation_constraints()
+    self.clear_position_constraints()
+
+  def clear_all_goals(self):
+    self.goal_pose_list.clear()
+    self.enable_check_event.clear()
+
+
+
+
+
+
+#------------------------------ CONSTRAINTS FUNCTIONS
 
   def set_joint_constraint(self, w1, w2, w3): #### EXPERIMENTAL
     # Joint name list : ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
@@ -349,300 +911,6 @@ class UR3_Movement(object):
 
     self.path_constraints.orientation_constraints.append(self.orientation_constraint)
     self.move_group.set_path_constraints(self.path_constraints)
-
-#-------------------  Movement threading
-  def homing_ur3(self):
-    self.clear_all_constrainst()
-    self.start_movement(self.home_joint_angle)
-
-  def start_movement(self, target_pose): # THIS FUNCTION IS USED FOR STARTING THE THREAD TO ROBOT GO TO PRESET GOAL
-    # start_pose = self.move_group.get_current_pose().pose
-    # self.start_orientation = start_pose.orientation
-    
-    self.target_pose = target_pose
-    self.completeGoal_flag.clear() # Always clear Complete Goal Flag before moving to goal
-    self.move_thread = threading.Thread(target=self._move_to_target) # Start and Stop this thread to run the robot
-    self.move_thread.start()
-
-  def continue_drawing(self):
-    self.release_stop_event()
-    if not self.move_thread or not self.move_thread.is_alive():
-        self.move_thread = threading.Thread(target=self._move_to_target)
-        self.move_thread.start()
-
-  def stop_movement(self): # Stop the robot and stop the thread (join)
-    self.stop_flag.set()
-    if self.move_thread:
-        self.move_thread.join()
-        self.move_group.stop()
-
-  def release_stop_event(self):
-    # Reset the stop flag after homing
-    print("\n----------Clear Stop Flag----------\n")
-    self.stop_flag.clear()
-
-  def set_new_home(self):
-    self.home_joint_angle = copy.deepcopy(self.move_group.get_current_joint_values())
-
-  def reset_home(self):
-    self.home_joint_angle = copy.deepcopy(self.home_joint_angle_original)
-
-
-  def set_origin_pose(self):
-    self.set_orientation_constraint(0.0005, 0.0005, 0.0005)
-    self.target_pose = None
-    start_pose = self.move_group.get_current_pose().pose
-    self.start_orientation = start_pose.orientation
-    print ("This is origin orientation: \n", self.start_orientation)
-
-
-  def clear_joint_constraints(self):
-    self.path_constraints.joint_constraints = []
-    self.move_group.clear_path_constraints()
-
-  def clear_orientation_constraints(self):
-    # Clear orientation constraint after use
-    self.path_constraints.orientation_constraints = []
-    self.move_group.clear_path_constraints()
-
-  def clear_position_constraints(self):
-    # Clear position constraint after use
-    self.path_constraints.position_constraints = []
-    self.move_group.clear_path_constraints()
-
-
-  def clear_all_constrainst(self):
-    self.clear_joint_constraints()
-    self.clear_orientation_constraints()
-    self.clear_position_constraints()
-
-  def clear_all_goals(self):
-    self.goal_pose_list.clear()
-    self.enable_check_event.clear()
-
-
-
-
-  ###################################################################################
-  def move_with_orientation_constraint(self, target_pose):     ## EXPERIMENTAL cannot work because cannot plan
-
-    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
-    self.clear_orientation_constraints()
-    waypoints = []
-    time.sleep(0.1)
-    current_pose = self.move_group.get_current_pose().pose
-    wpose = copy.deepcopy(current_pose)
-
-    delta_goal_z = target_pose[2] - current_pose.position.z
-    
-    if delta_goal_z != 0.00: 
-      wpose.position.z += delta_goal_z
-      waypoints.append(copy.deepcopy(wpose))
-
-    delta_goal_x = target_pose[0] - current_pose.position.x
-    delta_goal_y = target_pose[1] - current_pose.position.y
-
-    if delta_goal_x != 0.00:
-      wpose.position.x += delta_goal_x
-    
-    if delta_goal_y != 0.00:
-      wpose.position.y += delta_goal_y
-
-    wpose.orientation.x = self.start_orientation.x
-    wpose.orientation.y = self.start_orientation.y
-    wpose.orientation.z = self.start_orientation.z
-    wpose.orientation.w = self.start_orientation.w
-    waypoints.append(copy.deepcopy(wpose))
-
-    eef_step = self.eef_step_processing(delta_goal_x, delta_goal_y, delta_goal_z)
-    
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    self.timestamp_processing(plan)
-
-    if fraction >= 0.1:
-      self.move_group.execute(plan, wait = True)
-    else: print("----------------\nFailed to plan the trajectory!\n------------------")
-    
-    self.move_group.clear_path_constraints()
-    del waypoints
-    del wpose
-    del plan
-
-
-        
-  def timestamp_processing(self, plan, epsilon=1e-6):
-      """
-      Adjusts the time_from_start of waypoints in a trajectory if the last two waypoints have the same time_from_start.
-      
-      Args:
-          plan (RobotTrajectory): The trajectory to adjust.
-          epsilon (float): A small value to add to the time_from_start if adjustment is needed.
-      """
-      if len(plan.joint_trajectory.points) >= 2:
-          new_trajectory_points = [plan.joint_trajectory.points[0]]  # Initialize with the first point
-
-          for i in range(1, len(plan.joint_trajectory.points)):
-              current_point = plan.joint_trajectory.points[i]
-              previous_point = plan.joint_trajectory.points[i - 1]
-
-              current_timestamp = current_point.time_from_start.to_sec()
-              previous_timestamp = previous_point.time_from_start.to_sec()
-
-              if current_timestamp == previous_timestamp == 0.0:
-                  # Skip adding the current point if both current and previous timestamps are 0
-                  continue
-
-              new_trajectory_points.append(current_point)
-
-          # Update the trajectory points with the new list
-          plan.joint_trajectory.points = new_trajectory_points
-
-
-  def eef_step_processing(self, delta_goal_x, delta_goal_y, delta_goal_z): # For Small segments with more accuracy
-    # distance < 20mm : eef_step = 0.0075
-    # if eef_step > 0.02 cannot go
-    if delta_goal_z > 0.005:
-      eef_step = 0.025 # 0.012 
-    else: # If Z is not moving
-      distance = math.sqrt(delta_goal_x**2 + delta_goal_y**2)
-      if distance <= 30/1000: eef_step = 0.0075 #latest 0.007 # 0.0082 # distance <= 20
-      elif distance > 40/1000 and distance <= 80/1000: eef_step = 0.015 #0.01 # distance > 20
-      else: eef_step = 0.02
-
-    print("\nCurrent eef_step: \n", eef_step)
-    return eef_step
-
-#### from 0.008 to 0.015
-
-
-########################################################
-  def _check_goal_reached(self): 
-    rate = rospy.Rate(10)
-
-    while True:
-      # ---------------------------- CHECK IF THE GOAL IS REACHED -> USING SELF.TARGET_POSE
-      if np.all(self.target_pose):
-        # print ("Check length self.target pose = ", len(self.target_pose))
-        if len(self.target_pose) == 6:
-          # ----- Check if the current pose and the target pose is equal
-          current_joints = self.move_group.get_current_joint_values()
-          if all_close(self.target_pose, current_joints, 0.003):
-            print("\n----------------\nGoal Joint is reached !!!\n------------------\n")
-            self.target_pose = None
-            self.completeGoal_flag.set()
-            if self.move_thread.is_alive():
-              self.move_thread.join()
-              self.move_group.stop()
-
-
-        elif len(self.target_pose) == 3: 
-          # ----- Check if the position is reached
-          current_position = []
-          current_x = self.move_group.get_current_pose().pose.position.x
-          current_position.append(current_x)
-          current_y = self.move_group.get_current_pose().pose.position.y
-          current_position.append(current_y)
-          current_z = self.move_group.get_current_pose().pose.position.z
-          current_position.append(current_z)
-          # print ("Current Position: \n", current_position)
-          # print ("Target Pose: \n", self.target_pose)
-
-          # Calculate elapsed time
-          elapsed_time = time.time() - self.start_time
-          print("Elapsed time = ", elapsed_time)
-          if all_close(self.target_pose, current_position, 0.001): # REAL: 0.001 / SIM: 0.002
-            self.target_pose = None
-            self.completeGoal_flag.set()
-            time.sleep(0.05)
-            self.timer_exceed.clear()
-            if self.move_thread.is_alive():
-              self.move_thread.join()
-              self.move_group.stop()
-            print("\n----------------\nGoal Position is reached !!!\n------------------\n")
-            del current_position
-            time.sleep(0.05)
-          
-          elif elapsed_time > 5:
-              self.target_pose = None
-              self.completeGoal_flag.set()
-              time.sleep(0.05)
-              self.timer_exceed.set()
-              if self.move_thread.is_alive():
-                self.move_thread.join()
-                self.move_group.stop()
-              print("\n----------------\nTimer Exceeds !!!\n------------------\n")
-              del current_position
-              time.sleep(0.5)
-            
-
-
-      elif isinstance(self.target_pose, geometry_msgs.msg.Pose):
-        current_pose = self.move_group.get_current_pose().pose
-        if all_close(self.target_pose, current_pose, 0.003):
-          print("\n----------------\nGoal Pose is reached !!!\n------------------\n")
-          self.target_pose = None
-          self.completeGoal_flag.set()
-          if self.move_thread.is_alive():
-            self.move_thread.join()
-            self.move_group.stop()
-
-      rate.sleep()
-
-
-  #########################################################################
-  def _move_to_target(self):  ## FIX PLAN CARTERSIAN AND EXECUTE PLAN INSTEAD OF STATIC JOINT ANGLES
-    rate = rospy.Rate(10)  # Adjust the rate based on your requirements
-    print ("\nGo into move to target thread \n")
-    target_pose = self.target_pose
-    self.set_pos_goal_once.clear() 
-
-    while not self.stop_flag.is_set() and not self.completeGoal_flag.is_set():
-
-      # ---------------------------- SET PLAN THE TARGET POSE COPY ONLY ONCE
-      if np.all(target_pose): # ---- Joint angles
-        if len(target_pose) == 6:
-          print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
-          # ----- Move to joint target
-          plan = self.move_group.go(target_pose, wait=False)
-          if plan:
-            self.move_group.stop()  # Stop any ongoing movement
-            target_pose = None  # Reset target pose after movement
-
-        elif len(target_pose) == 3: # ----- Gcode X,Y,Z
-          if not self.set_pos_goal_once.is_set():
-            print("\n--------------------------\nRobot is running... !!!\n--------------------------\n")
-            self.move_with_orientation_constraint(target_pose)
-            self.set_pos_goal_once.set() # Set this flag so that this condition will run one time
-          # else: print("It's stop here") 
-
-      elif isinstance(target_pose, geometry_msgs.msg.Pose): # ----- Pose target
-        print("\n--------------------------\nRobot is running... !!!\n--------------------------")
-        # ----- Move to pose target
-        self.move_group.set_pose_target(target_pose)
-        plan = self.move_group.go(wait=False)
-        if plan:
-          self.move_group.stop()
-          target_pose = None
-
-      rate.sleep()  # Ensure that the loop runs at a specific rate INSIDE THE LOOP WHILE
-
-    print("\n--------------------------\nRobot Stops !!!\n--------------------------")
-
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -720,159 +988,168 @@ class UR3_Movement(object):
 
 # ------------------ Jogging movement
   def increase_x_tcp(self, value):
-    self.set_position_constraint(value_x= value, value_y= 0.05, value_z= 0.05, weight= 1.0)
-    self.set_orientation_constraint(tol_x= 0.05, tol_y= 0.05, tol_z= 0.05, weight= 1.0)
+    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
+    self.clear_orientation_constraints()
     
     waypoints = []
+    time.sleep(0.1)
     current_pose = self.move_group.get_current_pose().pose
     wpose = copy.deepcopy(current_pose)
 
     wpose.position.x += value/1000
+
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
-    if value > 10: eef_step = 0.01
-    else: eef_step = 0.0001
-
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    time.sleep(0.2)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.008, jump_threshold= 0.0, path_constraints= self.path_constraints)
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = False)
-      self.move_group.stop()  
+      self.move_group.execute(plan, wait = True)
 
+    self.move_group.clear_path_constraints()
     del waypoints
     del wpose
+    del plan
+
 
 
   def decrease_x_tcp(self, value):
-    self.set_position_constraint(value_x= value, value_y= 0.05, value_z= 0.05, weight= 1.0)
-    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
+    self.clear_orientation_constraints()
     
     waypoints = []
+    time.sleep(0.1)
     current_pose = self.move_group.get_current_pose().pose
     wpose = copy.deepcopy(current_pose)
 
     wpose.position.x -= value/1000
+
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
-    if value > 10: eef_step = 0.01
-    else: eef_step = 0.0001
-
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    time.sleep(0.2)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.008, jump_threshold= 0.0, path_constraints= self.path_constraints)
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = False)
-      self.move_group.stop()  
+      self.move_group.execute(plan, wait = True)
 
+    self.move_group.clear_path_constraints()
     del waypoints
     del wpose
+    del plan
+
 
 
   def increase_y_tcp(self, value):
-    self.set_position_constraint(value_x= 0.05, value_y= value, value_z= 0.05, weight= 1.0)
-    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
+    self.clear_orientation_constraints()
     
     waypoints = []
+    time.sleep(0.1)
     current_pose = self.move_group.get_current_pose().pose
-
     wpose = copy.deepcopy(current_pose)
 
     wpose.position.y += value/1000
+
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
-    if value > 10: eef_step = 0.01
-    else: eef_step = 0.0001
-
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    time.sleep(0.2)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.008, jump_threshold= 0.0, path_constraints= self.path_constraints)
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = False)
-      self.move_group.stop()  
+      self.move_group.execute(plan, wait = True)
 
+    self.move_group.clear_path_constraints()
     del waypoints
     del wpose
+    del plan
 
 
   def decrease_y_tcp(self, value):
-    self.set_position_constraint(value_x= 0.05, value_y= value, value_z= 0.05, weight= 1.0)
-    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
+    self.clear_orientation_constraints()
     
     waypoints = []
+    time.sleep(0.1)
     current_pose = self.move_group.get_current_pose().pose
-
     wpose = copy.deepcopy(current_pose)
 
     wpose.position.y -= value/1000
+
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
-    if value > 10: eef_step = 0.01
-    else: eef_step = 0.0001
-
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    time.sleep(0.2)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.008, jump_threshold= 0.0, path_constraints= self.path_constraints)
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = False)
-      self.move_group.stop()  
+      self.move_group.execute(plan, wait = True)
 
+    self.move_group.clear_path_constraints()
     del waypoints
     del wpose
+    del plan
 
 
   def increase_z_tcp(self, value):
-    self.set_position_constraint(value_x= 0.05, value_y= 0.05, value_z= value, weight= 1.0)
-    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
+    self.clear_orientation_constraints()
     
     waypoints = []
+    time.sleep(0.1)
     current_pose = self.move_group.get_current_pose().pose
-
     wpose = copy.deepcopy(current_pose)
 
     wpose.position.z += value/1000
+
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
-    if value > 10: eef_step = 0.01
-    else: eef_step = 0.0001
-
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    time.sleep(0.2)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.008, jump_threshold= 0.0, path_constraints= self.path_constraints)
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = False)
-      self.move_group.stop()  
+      self.move_group.execute(plan, wait = True)
 
+    self.move_group.clear_path_constraints()
     del waypoints
     del wpose
+    del plan
 
 
   def decrease_z_tcp(self, value):
-    self.set_position_constraint(value_x= 0.05, value_y= 0.05, value_z= value, weight= 1.0)
-    self.set_orientation_constraint(tol_x= 0.005, tol_y= 0.005, tol_z= 0.000005, weight= 1.0)
+    self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
+    self.clear_orientation_constraints()
     
     waypoints = []
+    time.sleep(0.1)
     current_pose = self.move_group.get_current_pose().pose
-
     wpose = copy.deepcopy(current_pose)
 
     wpose.position.z -= value/1000
+
+    wpose.orientation.x = self.start_orientation.x
+    wpose.orientation.y = self.start_orientation.y
+    wpose.orientation.z = self.start_orientation.z
+    wpose.orientation.w = self.start_orientation.w
     waypoints.append(copy.deepcopy(wpose))
 
-    if value > 10: eef_step = 0.01
-    else: eef_step = 0.0001
-
-    # (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0, path_constraints= self.path_constraints)
-    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= eef_step, jump_threshold= 0.0)
-    time.sleep(0.2)
+    (plan, fraction) = self.move_group.compute_cartesian_path(waypoints= waypoints, eef_step= 0.008, jump_threshold= 0.0, path_constraints= self.path_constraints)
     if fraction >= 0.1:
-      self.move_group.execute(plan, wait = False)
-      self.move_group.stop()  
+      self.move_group.execute(plan, wait = True)
+      self.move_group.stop()
 
+    self.move_group.clear_path_constraints()
     del waypoints
     del wpose
-
-
+    del plan
 
 
 

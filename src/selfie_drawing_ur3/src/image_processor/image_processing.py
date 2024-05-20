@@ -10,13 +10,12 @@ from rembg import remove
 import svgwrite
 import cairosvg
 import io
-import time
-
-
-
 
 
 class ImageProcessor:
+    # Set constant for enabling Camera
+    CAMERA_ENABLE = True
+
     def __init__(self) -> None:
         # Get the user's home directory
         self.home_directory = os.path.expanduser("~")
@@ -33,24 +32,17 @@ class ImageProcessor:
         if self.cap is None:
             print("No webcam device found.")
             return
-        
-        self.enable_camera = True
-        
+               
 
     def update_preview(self,canvas_preview, screen_width, screen_height):
         # Capture a frame
-        # ret, frame = self.cap.read()
-        # ret = None
-        # frame = None
-
-        if self.enable_camera:
+        if self.CAMERA_ENABLE:
             ret, frame = self.cap.read()
         else:
             ret = None
             frame = None
 
         if ret:
-
             # Convert the frame from BGR to RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -70,12 +62,8 @@ class ImageProcessor:
         canvas_preview.after(10, self.update_preview, canvas_preview, screen_width, screen_height)
 
     def take_picture(self,canvas_capture: Canvas, screen_width:int , screen_height: int):
-        # Capture a frame
-        # ret, frame = self.cap.read()
-        # ret = None
-        # frame = None
-        
-        if self.enable_camera:
+        # Capture a frame       
+        if self.CAMERA_ENABLE:
             ret, frame = self.cap.read()
         else:
             ret = None
@@ -149,7 +137,6 @@ class ImageProcessor:
         # Update the canvas with the processed image
         canvas_processed_image.create_image(0, 0, anchor=tk.NW, image=photo)
         canvas_processed_image.image = photo
-
 
     def trace_outline(self, canvas_traced_outline_image): # TESTING
         # Check if the captured image exists
@@ -226,8 +213,6 @@ class ImageProcessor:
         self.display_trace_outline(canvas_traced_outline_image)
         print("\nSVG image saved:", output_svg_path)
 
-
-
     def display_trace_outline(self,canvas_traced_outline_image: Canvas):
         file_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
         with open(file_path, "rb") as f:
@@ -244,9 +229,6 @@ class ImageProcessor:
         # Display the image on the canvas
         canvas_traced_outline_image.create_image(0, 0, anchor=tk.NW, image=photo)
         canvas_traced_outline_image.image = photo
-
-
-
 
     def svg_to_png(self,svg_data): # for display purpose
         png_data = cairosvg.svg2png(bytestring=svg_data)
