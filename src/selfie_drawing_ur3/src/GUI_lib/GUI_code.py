@@ -11,7 +11,6 @@ from PIL import Image
 import svgpathtools as svg
 
 from image_processor.image_processing import ImageProcessor
-from gcode_processor.gcode_processing import GcodeProcessing
 from ur3_control.move_ur3 import UR3_Movement
 
 import threading
@@ -23,12 +22,8 @@ import rospy
 class SelfieDrawingApp:
 
     # Define global variables for screen width and height in ratio 4:3
-    SCREEN_WIDTH    = 320  # px
-    SCREEN_HEIGHT   = 240 # px
-
-    # # Define SVG output size
-    # SVG_WIDTH   = 180/1000 # unit in mm
-    # SVG_HEIGHT  = 140/1000 # unit in mm
+    SCREEN_WIDTH = 320
+    SCREEN_HEIGHT = 240
 
     def __init__(self, master: tk.Tk):
         super().__init__()
@@ -58,7 +53,7 @@ class SelfieDrawingApp:
         # Add tabs to the notebook
         self.notebook.add(self.tab_take_picture, text="1. Take Photo & Processing")
         self.notebook.add(self.tab_easy_mode, text="2. Draw")
-        self.notebook.add(self.tab_robot_draw, text="3. Dev. Mode")
+        self.notebook.add(self.tab_robot_draw, text="2. Draw (Dev. Mode)")
 
         # X,Y,Z,Rx,Ry,Rz
         self.x_tcp = 0
@@ -74,9 +69,6 @@ class SelfieDrawingApp:
 
         # Initialize Image Processor
         self.image_processor = ImageProcessor()
-
-        # Initialize Gcode Processor
-        self.gcode_processor = GcodeProcessing()
 
         # Initialize components for the "Photo" tab
         self.init_take_picture_tab()
@@ -262,9 +254,10 @@ class SelfieDrawingApp:
         # Start the webcam preview
         self.update_preview()
 
-
     #-------------------- Init Easy Mode
     def init_easy_tab(self):
+            screen_width = self.SCREEN_WIDTH
+            screen_height = self.SCREEN_HEIGHT
             # Create a frame for the name
             name_frame = tk.Frame(self.tab_easy_mode)
             name_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, ipadx=5, ipady=5, sticky="w")
@@ -282,16 +275,16 @@ class SelfieDrawingApp:
             robot_name.pack(side=tk.LEFT, padx=(20, 40))  # Adjust padx as needed
             
             # Create a frame for "Robot Status"
-            robot_status_frame_easy = tk.Frame(status_frame)
-            robot_status_frame_easy.pack(side=tk.LEFT)
+            robot_status_frame = tk.Frame(status_frame)
+            robot_status_frame.pack(side=tk.LEFT)
 
             # Create a label for "Robot Status"
-            lbl_robot_status_easy = tk.Label(robot_status_frame_easy, text="Connection:", font=("Arial", 20))
-            lbl_robot_status_easy.pack(side=tk.LEFT)
+            lbl_robot_status = tk.Label(robot_status_frame, text="Connection:", font=("Arial", 20))
+            lbl_robot_status.pack(side=tk.LEFT)
 
             # Create a label to indicate the status (UPDATE REAL-TIME)
-            self.robot_status_label_easy = tk.Label(robot_status_frame_easy, text="Disconnected", font=("Arial", 16), bg="red", fg="white")
-            self.robot_status_label_easy.pack(side=tk.LEFT, padx=20, ipadx=10)
+            self.robot_status_label = tk.Label(robot_status_frame, text="Disconnected", font=("Arial", 16), bg="red", fg="white")
+            self.robot_status_label.pack(side=tk.LEFT, padx=20, ipadx=10)
 
             # Create a frame for "IP Address"
             ip_frame = tk.Frame(name_frame)
@@ -304,20 +297,17 @@ class SelfieDrawingApp:
             # Create an entry for IP address input
             self.ip_entry = tk.Entry(ip_frame, font=("Arial", 16), width=15)
             self.ip_entry.pack(side=tk.LEFT, padx=10)
-            
-            # Set the initial value of the entry widget
-            self.ip_entry.insert(0, "150.22.0.250") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
 
             # Create a button to connect
-            self.connect_button_easy = tk.Button(ip_frame, text="1. Connect", font=("Arial", 16), command= lambda: self.connect_to_robot_easy(), relief="raised", borderwidth=3, highlightthickness=2)
-            self.connect_button_easy.pack(side=tk.LEFT)
+            self.connect_button = tk.Button(ip_frame, text="1. Connect", font=("Arial", 16), command= lambda: self.connect_to_robot(), relief="raised", borderwidth=3, highlightthickness=2)
+            self.connect_button.pack(side=tk.LEFT)
 
             # Create a frame for Robot initialize
             initRobot_buttons_frame = tk.Frame(self.tab_easy_mode)
             initRobot_buttons_frame.grid(row=3, column=0, columnspan=1, sticky="w", pady= 10)
 
             # Create a button for "Init"
-            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize UR3 Robot", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 56, command= lambda: self.init_robot_ur3_easy(), relief="raised", borderwidth=3, highlightthickness=2)
+            initRobot_button = tk.Button(initRobot_buttons_frame, text="2. Initialize UR3 Robot", font=("Arial", 16), bg="#FFA500", fg="#FFFFFF", width= 56, command= lambda: self.init_robot_ur3_ez(), relief="raised", borderwidth=3, highlightthickness=2)
             initRobot_button.pack(side=tk.LEFT, padx=10)
 
             #--------------------------------------------- Draw Buttons
@@ -326,7 +316,7 @@ class SelfieDrawingApp:
             additional_buttons_frame.grid(row=4, column=0, columnspan=1, sticky="w", pady= 10)
 
             # Create a button for "Draw!"
-            draw_button = tk.Button(additional_buttons_frame, text="3. Draw!", font=("Arial", 16), bg="#008000", fg="#FFFFFF", width=56, command= lambda: self.start_drawing_easy(), relief="raised", borderwidth=3, highlightthickness=2)
+            draw_button = tk.Button(additional_buttons_frame, text="3. Draw!", font=("Arial", 16), bg="#008000", fg="#FFFFFF", width=56, command= lambda: self.start_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
             draw_button.pack(side=tk.LEFT, padx=(10, 30))
 
             #--------------------------------------------- Stopping Buttons
@@ -338,17 +328,9 @@ class SelfieDrawingApp:
             stop_button = tk.Button(stopping_buttons_frame, text="Stop", font=("Arial", 16), bg="#ff0000", fg="#FFFFFF", width=25, command=lambda: self.stop_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
             stop_button.pack(side=tk.LEFT, padx=(10, 30))
 
-            # Create a button for "Continue"
-            run_test_button = tk.Button(stopping_buttons_frame, text="Continue", font=("Arial", 16), bg="#0000FF", fg="#FFFFFF", width=25, command=lambda: self.continue_drawing(), relief="raised", borderwidth=3, highlightthickness=2)
+            # Create a button for "Run Test"
+            run_test_button = tk.Button(stopping_buttons_frame, text="Continue", font=("Arial", 16), bg="#0000FF", fg="#FFFFFF", width=25, command=lambda: self.release_stop(), relief="raised", borderwidth=3, highlightthickness=2)
             run_test_button.pack(side=tk.LEFT, padx=(10))
-            
-            #------------------------------------------- End drawing button
-            # Create a frame for end drawing button
-            terminate_frame = tk.Frame(self.tab_easy_mode)
-            terminate_frame.grid(row=6, column=0, columnspan=1, sticky="w", pady= 10)
-            # Create a button for termination
-            terminate_button = tk.Button(terminate_frame,text="4. End Drawing", font=("Arial", 16), bg="#000000", fg="#FFFFFF", command= lambda: self.end_drawing(), width=56, relief="raised", borderwidth=3, highlightthickness=2)
-            terminate_button.pack(side=tk.LEFT, padx=10)
             
             # Create frame for copy-right text.
             cr_frame = tk.Frame(self.tab_easy_mode)
@@ -358,6 +340,23 @@ class SelfieDrawingApp:
             copy_right = tk.Label(cr_frame, text="Brought to you by Group 23", font=("Arial", 15))
             copy_right.grid(row=0, column=0)
             
+            #---------------------------------SVG OUTLINE DISPLAY
+            # Create a frame for "Traced Outline Image" on the right
+            traced_outline_frame_ez = tk.Frame(self.tab_easy_mode, bd=2, relief=tk.SOLID)
+            traced_outline_frame_ez.grid(row=1, column=1, padx=10, pady=10)
+
+            # Create a label for "Traced Outline Image"
+            lbl_traced_outline = tk.Label(traced_outline_frame_ez, text="Trace Outline SVG", font=("Arial", 20))
+            lbl_traced_outline.pack()
+
+            # Create a canvas for displaying the traced outline image
+            self.canvas_traced_outline_image_ez = tk.Canvas(traced_outline_frame_ez, width=screen_width, height=screen_height)
+            self.canvas_traced_outline_image_ez.pack()
+
+            # Initialize traced outline image variable
+            self.traced_outline_image = None
+            
+
 
     #-------------------- Init Dev Tab
     def init_robot_draw_tab(self):
@@ -402,7 +401,7 @@ class SelfieDrawingApp:
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
         # Set the initial value of the entry widget
-        self.ip_entry.insert(0, "150.22.0.250") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
+        self.ip_entry.insert(0, "192.168.1.102") # 192.168.0.250 # ur3e 192.168.1.102
 
         # Create a button to connect
         self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
@@ -525,6 +524,10 @@ class SelfieDrawingApp:
         set_origin_button = tk.Button(set_button_frame, text= "Set Origin", font=("Arial", 16), width= 10, command= lambda: self.set_origin_ur3())
         set_origin_button.pack(side=tk.LEFT, padx=5)
 
+
+        # # Create a button for Importing file Gcode
+        # import_file_gcode_button = tk.Button(set_button_frame, text= "Import Gcode", font=("Arial", 16), width= 10, command= lambda: self.import_gcode())
+        # import_file_gcode_button.pack(side=tk.LEFT, padx=5)
 
         #--------------------------------------------- Draw Buttons
         # Create a frame for drawing buttons
@@ -689,14 +692,18 @@ class SelfieDrawingApp:
             frame_pose_goal_positions = self.gcode2pose(offset_frame_gcode_path)
             self.ur3_operate.set_frame_pose_goals_list(frame_pose_goal_positions)
 
+
+
             # Import Pose Goal position of Signature
             signature_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'signature_g23.gcode')
             offset_signature_gcode_path = self.offset_gcode(signature_gcode_path, self.desire_x_pos, self.desire_y_pos)
             signature_pose_goal_positions = self.gcode2pose(offset_signature_gcode_path)
             self.ur3_operate.set_signature_pose_goals_list(signature_pose_goal_positions)
 
+
         else:
             print("No Gcode file selected.")
+    
 
 
 
@@ -706,51 +713,12 @@ class SelfieDrawingApp:
         # Get the IP address from the entry widget
         robot_ip = self.ip_entry.get()
 
-        if robot_ip == "192.168.0.250":
-            command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
-            self.robot_type = "ur3"
-            
-        elif robot_ip == "192.168.1.104":
-            command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
-            self.robot_type = "ur3e"
-
-        else:
-            command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
-            self.robot_type = "ur3e"
-
-        self.robot_status_label.config(text="Connected", bg="green")
-        self.robot_status_label_easy.config(text="Connected", bg="green")
-
+        # Construct the command to execute
+        command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
 
         # Execute the command
         self.process = subprocess.Popen(command)
 
-    def connect_to_robot_easy(self):
-        # Get the IP address from the entry widget
-        robot_ip = self.ip_entry.get()
-        self.robot_type = "ur3"
-        
-        if robot_ip == "192.168.0.250":
-            command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
-            self.robot_type = "ur3"
-        elif robot_ip == "192.168.1.104":
-            command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
-            self.robot_type = "ur3e"
-        else:
-            command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
-            self.robot_type = "ur3e"
-
-        self.robot_status_label.config(text="Connected", bg="green")
-        self.robot_status_label_easy.config(text="Connected", bg="green")
-
-        # # # Execute the command
-        self.process = subprocess.Popen(command)
-        
-        time.sleep(5)
-        self.launch_moveit_planning_easy(robot_type= self.robot_type)
-        time.sleep(1)
-        print("----------------------\nPlease Run 'ur_robot_driver' on your robot!\n---------------------------------")
-        
     def terminate_process(self):
         # Terminate the process if it exists
         if self.process:
@@ -799,33 +767,13 @@ class SelfieDrawingApp:
     def launch_gazebo(self):
         # Construct the command to execute
         command = ['roslaunch', 'ur_gazebo', 'ur3e_bringup.launch']
-        self.robot_type = "ur3e"
-        self.robot_status_label.config(text="Connected", bg="green")
         # Execute the command
         self.process = subprocess.Popen(command) 
     
     def launch_moveit_planning(self): # Change the robot type here
-        if self.connection_type.get() == "real": 
-            if self.robot_type == "ur3e":
-                command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch"]
-            elif self.robot_type == "ur3": 
-                command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
-        else: 
-            if self.robot_type == "ur3e":
-                command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
-            elif self.robot_type == "ur3": 
-                command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
-            
+        if self.connection_type.get() == "real": command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch"]
+        else: command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch", "sim:=true"]
         
-        # Execute the command
-        self.process = subprocess.Popen(command) 
-
-    def launch_moveit_planning_easy(self, robot_type:str):
-        if robot_type == "ur3e":
-            command = ["roslaunch", "ur3e_moveit_config", "moveit_planning_execution.launch"]
-        elif robot_type == "ur3": 
-            command = ["roslaunch", "ur3_moveit_config", "moveit_planning_execution.launch"]
-
         # Execute the command
         self.process = subprocess.Popen(command) 
 
@@ -844,22 +792,42 @@ class SelfieDrawingApp:
         time.sleep(0.2)
         # Start update thread Robot TCP
         self.init_update_tcp_thread()
-        self.ur3_operate.set_robot_type(self.robot_type)
-
-    def init_robot_ur3_easy(self):
+    
+    def init_robot_ur3_ez(self):
+        print("initialising ur3")
         # Initialize UR3
         self.ur3_operate = UR3_Movement()
-
         # Start get thread Robot TCP
         self.ur3_operate.update_robot_tcp_thread()
         time.sleep(0.2)
         # Start update thread Robot TCP
         self.init_update_tcp_thread()
+        print("ur3 initialised in ez mode")
+        print("now homing in ez mode")
+        # Homing robot with specific joint state
+        self.ur3_operate.homing_ur3()
+        print("ur3 homed in ez mode")
+        
+        print("now import gcode in ez mode")
+        self.gcode_path = "rs2_ws/gcode/ur3_draw.gcode"
 
-        print("----------------------\nCareful !! Robot will move !!\n---------------------------------")
-        time.sleep(5)
-        self.homing_ur3()
-
+        print("now selecting gcode in ez mode")
+        if self.gcode_path:
+            # Perform import operations using the selected Gcode file path
+            print("Open Gcode file at: ", self.gcode_path)
+            offset_gcode_path = self.offset_gcode(self.gcode_path, self.desire_x_pos, self.desire_y_pos)
+            pose_goal_positions = self.gcode2pose(offset_gcode_path)
+            self.ur3_operate.set_pose_goals_list(pose_goal_positions)
+            
+            # Import Pose Goal position of Frame
+            frame_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'frame_square_150mm.gcode')
+            offset_frame_gcode_path = self.offset_gcode(frame_gcode_path, self.desire_x_pos, self.desire_y_pos)
+            frame_pose_goal_positions = self.gcode2pose(offset_frame_gcode_path)
+            self.ur3_operate.set_frame_pose_goals_list(frame_pose_goal_positions)
+        else:
+            print("No Gcode file selected.")
+        
+    
     def homing_ur3(self):
         # Homing robot with specific joint state
         self.ur3_operate.homing_ur3()
@@ -882,35 +850,7 @@ class SelfieDrawingApp:
     def start_drawing(self):
         self.ur3_operate.start_drawing()
 
-    def start_drawing_easy(self):
-        self.set_origin_ur3()
-        print("----------------------\nOrigin is set !\n---------------------------------")
-
-        self.clear_all_goals()
-
-        self.open_file_dialog()
-        time.sleep(3)
-        self.import_gcode()
-        print("Robot is ready to Draw !")
-        time.sleep(1)
-        if self.gcode_path:
-            self.start_drawing()
-        else: print("Cannot Start the Robot.")
-
-    def continue_drawing(self):
-        self.ur3_operate.continue_drawing()
-
-    def end_drawing(self):
-        self.clear_all_goals()
-        time.sleep(0.2)
-        self.stop_drawing()
-
     def stop_drawing(self):
-        self.ur3_operate.stop_movement()
-        time.sleep(0.3)
-        self.ur3_operate.release_stop_event()
-        time.sleep(0.1)
-        self.ur3_operate.homing_ur3()
         self.ur3_operate.stop_movement()
 
     def release_stop(self):
@@ -923,7 +863,6 @@ class SelfieDrawingApp:
     def clear_all_goals(self):
         print("\n----------------\nAll Goals are clear !!!\n------------------\n")
         self.ur3_operate.clear_all_goals()
-
 
 
     #------------------- Update TCP of UR3 Threading
@@ -987,7 +926,7 @@ class SelfieDrawingApp:
         self.timer_thread = threading.Thread(target=self._run_timer)
         self.timer_thread.start()
 
-    def stop_countdown(self):
+    def stop(self):
         self.running = False
 
     def _run_timer(self):
@@ -1002,7 +941,7 @@ class SelfieDrawingApp:
         if self.running:
             if self.callback:
                 self.callback()
-                self.stop_countdown()
+                self.stop()
 
     def set_countdown(self,seconds):
         self.countdown_value = seconds
@@ -1049,18 +988,140 @@ class SelfieDrawingApp:
         self.image_processor.update_preview(self.canvas_preview, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
 
     def process_img(self):
-        self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image)
+        self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image, self.canvas_traced_outline_image_ez)
 
     #--------------------- Buttons for Gcode processing
 
     def generate_gcode(self): # convert SVG file to Gcode
-        self.gcode_processor.generate_gcode()
+        # Check if the svg file exists
+        svg_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
+        if not os.path.exists(svg_path):
+            print("SVG file not found.")
+            return
+
+        # Load SVG file
+        paths, _ = svg.svg2paths(svg_path)
+
+        # Calculate SVG center
+        svg_center_x, svg_center_y = self.calculate_svg_center(paths)
+
+        # Desired center point (center coordinate)
+        desired_center_x, desired_center_y = 0, 0  # Modify as needed
+
+        # Calculate displacement
+        displacement_x = desired_center_x - svg_center_x
+        displacement_y = desired_center_y - svg_center_y
+
+        # Scale factor (adjust as needed)
+        scale = 0.001  # Experiment with this value
+
+        save_folder_gcode = os.path.join(self.home_directory, "rs2_ws", "gcode")
+        
+        # Ensure the save folder exists, create it if it doesn't
+        if not os.path.exists(save_folder_gcode):
+            os.makedirs(save_folder_gcode)
+
+        gcode_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw.gcode")
+
+        # Open G-code file
+        with open(gcode_path, 'w') as f:
+            for path in paths:
+                for i, segment in enumerate(path):
+                    # Extract segment information
+                    start = segment.start
+                    end = segment.end
+
+                    # Convert coordinates to G-code coordinates
+                    start_x, start_y = (start.real + displacement_x) * scale, (start.imag + displacement_y) * scale
+                    end_x, end_y = (end.real + displacement_x) * scale, (end.imag + displacement_y) * scale
+
+                    # Adjust Y coordinate to match G-code coordinate system (mirror along Y-axis)
+                    start_y = -start_y
+                    end_y = -end_y
+
+                    # Write G-code commands
+                    if i == 0:
+                        f.write(f"G0 X{start_x:.10f} Y{start_y:.10f}\n")  # Rapid move to start point
+                    f.write(f"G1 X{end_x:.10f} Y{end_y:.10f}\n")  # Linear move to end point
+
+
+        print("Generate Gcode Done!")
+        
+    def calculate_svg_center(self,paths):
+        # Calculate the bounding box of all paths
+        min_x, max_x = float('inf'), float('-inf')
+        min_y, max_y = float('inf'), float('-inf')
+        for path in paths:
+            for segment in path:
+                start = segment.start
+                end = segment.end
+                min_x = min(min_x, start.real, end.real)
+                max_x = max(max_x, start.real, end.real)
+                min_y = min(min_y, start.imag, end.imag)
+                max_y = max(max_y, start.imag, end.imag)
+
+        # Calculate the center point
+        center_x = (min_x + max_x) / 2
+        center_y = (min_y + max_y) / 2
+        return center_x, center_y
 
 
     def offset_gcode(self, gcode_path, offset_x, offset_y):
-        new_gcode_path = self.gcode_processor.offset_gcode(gcode_path= gcode_path, offset_x= offset_x, offset_y= offset_y)
-        return new_gcode_path
+        # Create folder for offset files if it doesn't exist
+        save_folder_offset = os.path.join(self.home_directory, "rs2_ws", "offset_files")
+        if not os.path.exists(save_folder_offset):
+            os.makedirs(save_folder_offset)
+
+        new_gcode_path = os.path.splitext(os.path.basename(gcode_path))[0] + "_offset.gcode"
+        new_gcode_path = os.path.join(save_folder_offset, new_gcode_path)
+
+        with open(gcode_path, 'r') as file:
+            with open(new_gcode_path, 'w') as new_file:
+                for line in file:
+                    if line.startswith('G0') or line.startswith('G1'):
+                        # Extract X and Y coordinates
+                        parts = line.split()
+                        x_coord = None
+                        y_coord = None
+                        for part in parts:
+                            if part.startswith('X'):
+                                x_coord = float(part[1:])
+                            elif part.startswith('Y'):
+                                y_coord = float(part[1:])
+                        if x_coord is not None and y_coord is not None:
+                            # Apply offset
+                            x_coord += offset_x * 1.08  # Adjust this parameter to modify the frame inside working area
+                            y_coord += offset_y
+                            # Write modified line to new file
+                            new_line = f"{parts[0]} X{x_coord:.6f} Y{y_coord:.6f}\n"
+                            new_file.write(new_line)
+                    else:
+                        # Write non-coordinate lines unchanged
+                        new_file.write(line)
+
+        return new_gcode_path 
+
 
     def gcode2pose(self, new_gcode_path): # adjust the Z different
-        pose_goal_positions = self.gcode_processor.gcode2pose(new_gcode_path= new_gcode_path, robot_type= self.robot_type)
+        # Read the Gcode file and extract the pose goal positions
+        # gcode_file_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw_offset.gcode")
+        gcode_file_path = new_gcode_path
+        pose_goal_positions = []
+
+        with open (gcode_file_path, 'r') as file:
+            for line in file:
+                if line.startswith('G0'):
+                    # Extract X,Y coordinates from the gcode file
+                    x = float(line.split('X')[1].split(' ')[0])
+                    y = float(line.split('Y')[1].split(' ')[0])
+                    z = 0.16
+                    pose_goal_positions.append([x,y,z])
+
+                elif line.startswith('G1'):
+                    # Extract X,Y coordinates from the gcode file
+                    x = float(line.split('X')[1].split(' ')[0])
+                    y = float(line.split('Y')[1].split(' ')[0])
+                    z = 0.13 # ur3: 0.125 #ur3e: 0.13
+                    pose_goal_positions.append([x,y,z])
+
         return pose_goal_positions
