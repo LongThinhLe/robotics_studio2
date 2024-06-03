@@ -140,20 +140,12 @@ class UR3_Movement(object):
         self.enable_check_event = threading.Event() # Flag for checking goal
         self.enable_check_event.set()
 
-        # self.goalReach = threading.Event()
-        # self.goalReach.clear()
-
-        # self.check_goal_reached_thread = threading.Thread(target=self._check_goal_reached)
-        # self.check_goal_reached_thread.start()
-
         # This joint angle is perfect for 150mm Square without self-collision: [0.3438, -1.7949, -2.1418, -0.4759, -4.8844, -5.9389]
         # ur3e : [-1.122, -1.7949, -2.1418, -0.4759, -4.8844, 0.349]
         # ur3e further: [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972]
         self.home_joint_angle_original = [-1.1810186545001429, -1.9437056980528773, -1.9343211650848389, -0.5028556150249024, -4.868577424679891, 0.34874417972]# ur3e [-1.17545, -1.94233, -1.93044, -0.53136, -4.86835, 0.2972] # ur3[0.3438, -1.7949, -2.1418, -0.4759, -4.8844, 0.349] #[20, -100, -125, -26, -280, 20]  #0.349, -1.7453, -2.1816, -0.4537, -4.8869, 0.349
-        # self.home_joint_angle_original = np.deg2rad(self.home_joint_angle_original)
 
         self.home_joint_angle = self.home_joint_angle_original # ur3[0.3438, -1.7949, -2.1418, -0.4759, -4.8844, 0.349] # [20, -100, -125, -26, -280, 20]
-        # self.home_joint_angle = np.deg2rad(self.home_joint_angle)
 
         self.step_to_draw = 0 # 0: draw SVG file, 1: draw Square Frame, 2: draw Signature
         
@@ -207,18 +199,12 @@ class UR3_Movement(object):
                       current_z_goal = self.goal_pose_list[0][0][2] # Z value in 1 coordinate
                       next_z_goal = self.goal_pose_list[0][1][2]
 
-                      print("Current z goal =", current_z_goal)
-                      print("Next_z_Goal = ", next_z_goal)
-
                       if not self.timer_exceed.is_set():
-                          print("Go Here 1")
                           if current_z_goal != next_z_goal: # if there is a change in Z
                               run_goal = self.goal_pose_list[0][0] # run single goal
-                              print("Run goal 1 =\n", run_goal)
 
                           else: # if there is no change in Z
                               count_continuous_goal = 0
-                              print("Go Here 2")
 
                               for i in range(len(self.goal_pose_list[0]) - 1):
                                   current_z_goal = self.goal_pose_list[0][i][2]
@@ -227,37 +213,30 @@ class UR3_Movement(object):
                                   if current_z_goal == next_z_goal: # Run through pose goal list: if Z is not change, put the current goal in continuous goal
                                       continuous_goals.append(self.goal_pose_list[0][i])
                                       count_continuous_goal += 1
-                                      print("Count continue goal = \n", count_continuous_goal)
 
                                   else:
                                       continuous_goals.append(self.goal_pose_list[0][i])
                                       count_continuous_goal += 1
                                       run_goal = continuous_goals.copy()
-                                      print("Run goal 2 =\n", run_goal)
                                       continuous_goals.clear()
                                       break
 
                                   if i == len(self.goal_pose_list[0]) - 2: # If there is no Z change until last position
                                       run_goal = continuous_goals.copy()
-                                      print("Run goal 3 =\n", run_goal)
                                       continuous_goals.clear()
                                       break
                       else: # Run again previous goal
                           run_goal = self.goal_pose_list[0][0] # run again the previous goal because it can not reach
-                          print("Run goal 4 =\n", run_goal)
                   else: # if the goal pose list has only 2 coordinate left:
                       run_goal = self.goal_pose_list[0][0]
-                      print("Run goal 5 =\n", run_goal)
 
-                  print("Run goal 6 =\n", run_goal)
                   self.start_time = time.time()
                   self.start_movement(run_goal) # send target_pose here: single list or multiple list here
 
                   # Get the first goal from the list
-                  print(count_goal, ".New Goal: ", run_goal)
                   # Wait for completion
                   self.completeGoal_flag.wait()
-                  print("Finish check Goal")
+                  # print("Finish check Goal")
 
                   if self.timer_exceed.is_set(): # Robot cannot fully reach goal -> run that goal again
                       print("\n----------\nRun Again Current Goal!!!\n----------\n")
@@ -266,15 +245,15 @@ class UR3_Movement(object):
                       if count_continuous_goal > 0: # After putting all the consecutive goals to run, pop them
                           for i in range(count_continuous_goal):
                               goal_popped = self.goal_pose_list[0].pop(0)
-                              print("Pop goal:  ", goal_popped)
+                              # print("Pop goal:  ", goal_popped)
                       else:
                           first_goal_popped = self.goal_pose_list[0].pop(0)
-                          print("Pop the first goal ONLY: ", first_goal_popped)
+                          # print("Pop the first goal ONLY: ", first_goal_popped)
 
                   time.sleep(0.05) # 0.5 simulation # 0.15 real robot
 
               except Exception as e:
-                  print("Exception occurred: ", str(e))
+                  # print("Exception occurred: ", str(e))
                   print("Finish all goals")
                   self.homing_ur3()
                   self.step_to_draw += 1
@@ -296,7 +275,7 @@ class UR3_Movement(object):
 
   def _move_to_target(self): # MULTIPLE GOALS
     rate = rospy.Rate(10)  # Adjust the rate based on your requirements
-    print ("\nGo into move to target thread \n")
+    # print ("\nGo into move to target thread \n")
     target_pose = self.target_pose
     self.set_pos_goal_once.clear() 
 
@@ -308,13 +287,14 @@ class UR3_Movement(object):
         # print("Move single target !")
         self.move_single_target(target_pose)
 
-
+      self.elapsed_time = time.time() - self.start_time # Start timer when running to goal
+      print("Running time = ", self.elapsed_time)
       rate.sleep()  # Ensure that the loop runs at a specific rate INSIDE THE LOOP WHILE
 
-    print("\n--------------------------\nRobot Stops !!!\n--------------------------")
+    print("\n--------------------------\nRobot Stops !!!\n--------------------------\n")
 
 
-  def move_single_target(self, target_pose):  ## FIX PLAN CARTERSIAN AND EXECUTE PLAN INSTEAD OF STATIC JOINT ANGLES
+  def move_single_target(self, target_pose): 
     # ---------------------------- SET PLAN THE TARGET POSE COPY ONLY ONCE
     if np.all(target_pose):
       if len(target_pose) == 6:  # ---- Joint angles
@@ -374,8 +354,6 @@ class UR3_Movement(object):
           wpose.orientation.z = self.start_orientation.z
           wpose.orientation.w = self.start_orientation.w
           waypoints.append(copy.deepcopy(wpose))
-
-      # eef_step = self.eef_step_processing(delta_goal_x, delta_goal_y, delta_goal_z)
       
       (plan, fraction) = self.move_group.compute_cartesian_path(
           waypoints=waypoints, eef_step=0.01, jump_threshold=0.0, path_constraints=self.path_constraints
@@ -389,7 +367,7 @@ class UR3_Movement(object):
 
       if result:
         self.completeGoal_flag.set()
-        print("\n----------------\nComplete Flag is set !!!\n------------------\n")
+        print("\n------------------\nComplete Flag is set !!!\n------------------\n")
 
 
       self.move_group.clear_path_constraints()
@@ -442,6 +420,7 @@ class UR3_Movement(object):
     if result:
       self.completeGoal_flag.set()
       print("\n----------------\nComplete Flag is set !!!\n------------------\n")
+       
 
     self.move_group.clear_path_constraints()
     del waypoints
@@ -496,7 +475,7 @@ class UR3_Movement(object):
       elif distance > 40/1000 and distance <= 80/1000: eef_step = 0.015 #0.01 # distance > 20
       else: eef_step = 0.02
 
-    print("\nCurrent eef_step: \n", eef_step)
+    # print("\nCurrent eef_step: \n", eef_step)
     return eef_step
 
 #### from 0.008 to 0.015

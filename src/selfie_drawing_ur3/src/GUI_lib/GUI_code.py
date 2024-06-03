@@ -134,16 +134,16 @@ class SelfieDrawingApp:
 
         #--------------------------------LIVE CAMERA
         # Create a frame to hold the preview screen and its label
-        preview_frame = tk.Frame(self.tab_take_picture, bd=2, relief=tk.SOLID)
-        preview_frame.grid(row=0, column=0, padx=10, pady=10)
+        live_cam_frame = tk.Frame(self.tab_take_picture, bd=2, relief=tk.SOLID)
+        live_cam_frame.grid(row=0, column=0, padx=10, pady=10)
         
         # Create a label for the preview screen with increased font size
-        lbl_preview = tk.Label(preview_frame, text="Live Camera", font=("Arial", 20, "bold"), fg="#c71010")
-        lbl_preview.pack()
+        lbl_live_cam = tk.Label(live_cam_frame, text="Live Camera", font=("Arial", 20, "bold"), fg="#c71010")
+        lbl_live_cam.pack()
 
         # Create a canvas for the preview screen
-        self.canvas_preview = tk.Canvas(preview_frame, width=screen_width, height=screen_height)
-        self.canvas_preview.pack()
+        self.canvas_live_camera = tk.Canvas(live_cam_frame, width=screen_width, height=screen_height)
+        self.canvas_live_camera.pack()
 
 
         #--------------------------------CAPTURE SCREEN
@@ -306,7 +306,7 @@ class SelfieDrawingApp:
             self.ip_entry.pack(side=tk.LEFT, padx=10)
             
             # Set the initial value of the entry widget
-            self.ip_entry.insert(0, "150.22.0.250") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
+            self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
 
             # Create a button to connect
             self.connect_button_easy = tk.Button(ip_frame, text="1. Connect", font=("Arial", 16), command= lambda: self.connect_to_robot_easy(), relief="raised", borderwidth=3, highlightthickness=2)
@@ -402,7 +402,7 @@ class SelfieDrawingApp:
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
         # Set the initial value of the entry widget
-        self.ip_entry.insert(0, "150.22.0.250") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
+        self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
 
         # Create a button to connect
         self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
@@ -1046,7 +1046,7 @@ class SelfieDrawingApp:
         self.image_processor.take_picture(self.canvas_capture, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
 
     def update_preview(self):
-        self.image_processor.update_preview(self.canvas_preview, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
+        self.image_processor.update_preview(self.canvas_live_camera, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
 
     def process_img(self):
         self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image)

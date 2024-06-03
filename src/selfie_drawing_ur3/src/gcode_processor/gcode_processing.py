@@ -64,7 +64,7 @@ class GcodeProcessing:
         if not os.path.exists(save_folder_gcode):
             os.makedirs(save_folder_gcode)
 
-        gcode_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "ur3_draw.gcode")
+        gcode_path = os.path.join(self.home_directory, "rs2_ws", "gcode", "your_portrait.gcode")
 
         # Open G-code file
         with open(gcode_path, 'w') as f:
