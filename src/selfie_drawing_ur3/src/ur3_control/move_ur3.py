@@ -230,7 +230,7 @@ class UR3_Movement(object):
                   else: # if the goal pose list has only 2 coordinate left:
                       run_goal = self.goal_pose_list[0][0]
 
-                  self.start_time = time.time()
+                  # self.start_time = time.time()
                   self.start_movement(run_goal) # send target_pose here: single list or multiple list here
 
                   # Get the first goal from the list
@@ -287,8 +287,8 @@ class UR3_Movement(object):
         # print("Move single target !")
         self.move_single_target(target_pose)
 
-      self.elapsed_time = time.time() - self.start_time # Start timer when running to goal
-      print("Running time = ", self.elapsed_time)
+      # self.elapsed_time = time.time() - self.start_time # Start timer when running to goal
+      # print("Running time = ", self.elapsed_time)
       rate.sleep()  # Ensure that the loop runs at a specific rate INSIDE THE LOOP WHILE
 
     print("\n--------------------------\nRobot Stops !!!\n--------------------------\n")

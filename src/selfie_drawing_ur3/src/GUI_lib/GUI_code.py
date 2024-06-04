@@ -306,7 +306,7 @@ class SelfieDrawingApp:
             self.ip_entry.pack(side=tk.LEFT, padx=10)
             
             # Set the initial value of the entry widget
-            self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
+            self.ip_entry.insert(0, "192.168.1.102") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
 
             # Create a button to connect
             self.connect_button_easy = tk.Button(ip_frame, text="1. Connect", font=("Arial", 16), command= lambda: self.connect_to_robot_easy(), relief="raised", borderwidth=3, highlightthickness=2)
@@ -402,7 +402,7 @@ class SelfieDrawingApp:
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
         # Set the initial value of the entry widget
-        self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
+        self.ip_entry.insert(0, "192.168.1.102") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
 
         # Create a button to connect
         self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())
@@ -733,7 +733,7 @@ class SelfieDrawingApp:
         if robot_ip == "192.168.0.250":
             command = ["roslaunch", "ur_robot_driver", "ur3_bringup.launch", f"robot_ip:={robot_ip}"]
             self.robot_type = "ur3"
-        elif robot_ip == "192.168.1.104":
+        elif robot_ip == "192.168.1.102":
             command = ["roslaunch", "ur_robot_driver", "ur3e_bringup.launch", f"robot_ip:={robot_ip}"]
             self.robot_type = "ur3e"
         else:
@@ -883,6 +883,8 @@ class SelfieDrawingApp:
         self.ur3_operate.start_drawing()
 
     def start_drawing_easy(self):
+        self.homing_ur3()
+        time.sleep(2)
         self.set_origin_ur3()
         print("----------------------\nOrigin is set !\n---------------------------------")
 
@@ -893,6 +895,8 @@ class SelfieDrawingApp:
         self.import_gcode()
         print("Robot is ready to Draw !")
         time.sleep(1)
+
+
         if self.gcode_path:
             self.start_drawing()
         else: print("Cannot Start the Robot.")
