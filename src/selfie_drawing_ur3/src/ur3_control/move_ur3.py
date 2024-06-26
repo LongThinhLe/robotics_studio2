@@ -232,7 +232,7 @@ class UR3_Movement(object):
 
                   # self.start_time = time.time()
                   self.start_movement(run_goal) # send target_pose here: single list or multiple list here
-
+                  run_goal = None
                   # Get the first goal from the list
                   # Wait for completion
                   self.completeGoal_flag.wait()
@@ -255,6 +255,7 @@ class UR3_Movement(object):
               except Exception as e:
                   # print("Exception occurred: ", str(e))
                   print("Finish all goals")
+                  self.increase_z_tcp(8)
                   self.homing_ur3()
                   self.step_to_draw += 1
 
@@ -509,6 +510,7 @@ class UR3_Movement(object):
     print ("\nSignature Ready !")
 
   def draw_frame(self):
+    self.completeGoal_flag.wait()
     print("\nChanging Pen 2...")
     self.change2Pen2()
     time.sleep(3)
@@ -521,6 +523,8 @@ class UR3_Movement(object):
     self.enable_check_event.set()
   
   def draw_signature(self):
+    self.completeGoal_flag.wait()
+    print("\nChanging Pen 3...")
     self.change2Pen3()
     time.sleep(4)
     print("\nWaiting to draw Signature ............")
@@ -597,7 +601,10 @@ class UR3_Movement(object):
 
   def clear_all_goals(self):
     self.goal_pose_list.clear()
+    self.target_pose = None
     self.enable_check_event.clear()
+    self.step_to_draw = 2
+    
 
 
 
@@ -752,6 +759,7 @@ class UR3_Movement(object):
 
 # ------------------ Jogging movement
   def increase_x_tcp(self, value):
+    self.set_origin_pose()
     self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
     self.clear_orientation_constraints()
     
@@ -780,6 +788,7 @@ class UR3_Movement(object):
 
 
   def decrease_x_tcp(self, value):
+    self.set_origin_pose()
     self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
     self.clear_orientation_constraints()
     
@@ -808,6 +817,7 @@ class UR3_Movement(object):
 
 
   def increase_y_tcp(self, value):
+    self.set_origin_pose()
     self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
     self.clear_orientation_constraints()
     
@@ -835,6 +845,7 @@ class UR3_Movement(object):
 
 
   def decrease_y_tcp(self, value):
+    self.set_origin_pose()
     self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
     self.clear_orientation_constraints()
     
@@ -862,6 +873,7 @@ class UR3_Movement(object):
 
 
   def increase_z_tcp(self, value):
+    self.set_origin_pose()
     self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
     self.clear_orientation_constraints()
     
@@ -889,6 +901,7 @@ class UR3_Movement(object):
 
 
   def decrease_z_tcp(self, value):
+    self.set_origin_pose()
     self.set_joint_constraint(0.7, 0.7, 0.7) # GOOD = 1 joint constraint (2)
     self.clear_orientation_constraints()
     

@@ -23,12 +23,8 @@ import rospy
 class SelfieDrawingApp:
 
     # Define global variables for screen width and height in ratio 4:3
-    SCREEN_WIDTH    = 320  # px
-    SCREEN_HEIGHT   = 240 # px
-
-    # # Define SVG output size
-    # SVG_WIDTH   = 180/1000 # unit in mm
-    # SVG_HEIGHT  = 140/1000 # unit in mm
+    SCREEN_WIDTH    = 450  # 320px
+    SCREEN_HEIGHT   = 340 # 240px
 
     def __init__(self, master: tk.Tk):
         super().__init__()
@@ -131,12 +127,11 @@ class SelfieDrawingApp:
         screen_width = self.SCREEN_WIDTH
         screen_height = self.SCREEN_HEIGHT
 
-
         #--------------------------------LIVE CAMERA
         # Create a frame to hold the preview screen and its label
         live_cam_frame = tk.Frame(self.tab_take_picture, bd=2, relief=tk.SOLID)
         live_cam_frame.grid(row=0, column=0, padx=10, pady=10)
-        
+
         # Create a label for the preview screen with increased font size
         lbl_live_cam = tk.Label(live_cam_frame, text="Live Camera", font=("Arial", 20, "bold"), fg="#c71010")
         lbl_live_cam.pack()
@@ -144,7 +139,6 @@ class SelfieDrawingApp:
         # Create a canvas for the preview screen
         self.canvas_live_camera = tk.Canvas(live_cam_frame, width=screen_width, height=screen_height)
         self.canvas_live_camera.pack()
-
 
         #--------------------------------CAPTURE SCREEN
         # Create a frame to hold the capture screen and its label
@@ -159,7 +153,6 @@ class SelfieDrawingApp:
         self.canvas_capture = tk.Canvas(capture_frame, width=screen_width, height=screen_height)
         self.canvas_capture.pack()
 
-
         #--------------------------------REMOVE BACKGROUND DISPLAY
         # Create a frame for "Removed Background Image" on the left
         removed_bg_frame = tk.Frame(self.tab_take_picture, bd=2, relief=tk.SOLID)
@@ -172,8 +165,7 @@ class SelfieDrawingApp:
         # Create a canvas for displaying the processed image
         self.canvas_processed_image = tk.Canvas(removed_bg_frame, width=screen_width, height=screen_height)
         self.canvas_processed_image.pack()
-        
-        
+
         #---------------------------------SVG OUTLINE DISPLAY
         # Create a frame for "Traced Outline Image" on the right
         traced_outline_frame = tk.Frame(self.tab_take_picture, bd=2, relief=tk.SOLID)
@@ -190,7 +182,6 @@ class SelfieDrawingApp:
         # Initialize traced outline image variable
         self.traced_outline_image = None
 
-
         #----------------------------------BUTTONS
         # Create a frame to hold the additional buttons
         countdown_frame = tk.Frame(self.tab_take_picture)
@@ -200,14 +191,13 @@ class SelfieDrawingApp:
         lbl_countdown = tk.Label(countdown_frame, text="Countdown Timer", font=("Arial", 20, "bold"))
         lbl_countdown.grid(row=0, column=0, columnspan=4, pady=5)
 
-        
         # Create buttons for 0, 3, 5, and 10 seconds
         self.countdown_value = 0
 
         self.btn_0_sec = tk.Button(countdown_frame, text="None", command=lambda: self.set_countdown(0), bg="#9289f5", fg="#FFFFFF", highlightthickness=1, highlightbackground="black", relief="raised", borderwidth=3)
-        self.btn_3_sec = tk.Button(countdown_frame, text="3s", command=lambda: self.set_countdown(3), bg="#8079d1", fg="#FFFFFF", highlightthickness=0, highlightbackground="black", relief="raised", borderwidth=3)
-        self.btn_5_sec = tk.Button(countdown_frame, text="5s", command=lambda: self.set_countdown(5), bg="#716bb5", fg="#FFFFFF", highlightthickness=0, highlightbackground="black", relief="raised", borderwidth=3)
-        self.btn_10_sec = tk.Button(countdown_frame, text="10s", command=lambda: self.set_countdown(10), bg="#5e5996", fg="#FFFFFF", highlightthickness=0, highlightbackground="black", relief="raised", borderwidth=3)
+        self.btn_3_sec = tk.Button(countdown_frame, text="3s", command=lambda: self.set_countdown(2), bg="#8079d1", fg="#FFFFFF", highlightthickness=0, highlightbackground="black", relief="raised", borderwidth=3)
+        self.btn_5_sec = tk.Button(countdown_frame, text="5s", command=lambda: self.set_countdown(4), bg="#716bb5", fg="#FFFFFF", highlightthickness=0, highlightbackground="black", relief="raised", borderwidth=3)
+        self.btn_10_sec = tk.Button(countdown_frame, text="10s", command=lambda: self.set_countdown(9), bg="#5e5996", fg="#FFFFFF", highlightthickness=0, highlightbackground="black", relief="raised", borderwidth=3)
 
         # Grid buttons in the countdown frame
         self.btn_0_sec.grid(row=1, column=0, padx=5, pady=0)
@@ -221,6 +211,33 @@ class SelfieDrawingApp:
         self.btn_5_sec.bind("<ButtonPress-1>", self.button_pressed)
         self.btn_10_sec.bind("<ButtonPress-1>", self.button_pressed)
 
+        # Create a frame for the Name input and Draw button
+        name_draw_frame = tk.Frame(self.tab_take_picture)
+        name_draw_frame.grid(row=0, column=3, padx=10, pady=10, sticky='ns')
+
+        # Create a label for the Name input
+        lbl_name = tk.Label(name_draw_frame, text="Name & Hashtag", font=("Arial", 20, "bold"))
+        lbl_name.grid(row=0, column=0, pady=5)
+
+        # Create a textbox for Name input
+        self.entry_name = tk.Entry(name_draw_frame, font=("Aharoni", 25), bd=2, relief=tk.SOLID, width= 16)
+        self.entry_name.grid(row=1, column=0, padx=5, pady=5)
+
+        self.entry_hashtag = tk.Entry(name_draw_frame, font= ("Aharoni", 25), bd=2, relief=tk.SOLID, width= 16)
+        self.entry_hashtag.grid(row=2, column=0, padx=5, pady=5)
+
+        # Create the Draw button
+        self.btn_draw = tk.Button(name_draw_frame, text="Draw!", command=lambda: self.start_drawing_easy(), bg="grey", fg="#FFFFFF", width=15, height=5, relief="raised", borderwidth=3, highlightthickness=2, state=tk.DISABLED)
+        self.btn_draw.grid(row=3, column=0, padx=10, pady=10)
+
+        # Create the Stop drawing button
+        self.btn_stop = tk.Button(name_draw_frame, text="Stop Drawing!", command=lambda: self.end_drawing(), bg="red", fg="#FFFFFF", width=15, height=5, relief="raised", borderwidth=3, highlightthickness=2,  state=tk.DISABLED)
+        self.btn_stop.grid(row=4, column=0, padx=10, pady=10)
+
+        # Add copy-right text under the "Stop Drawing!" button
+        copy_right = tk.Label(name_draw_frame, text="made by\nLong Thinh Le\nDennis Nguyen\nStewart Kelly\nSamuel Bloomfield", font=("Arial", 15))
+        copy_right.grid(row=5, column=0, pady=10)
+
 
         # Create a frame to hold the buttons
         button_frame = tk.Frame(self.tab_take_picture)
@@ -231,14 +248,13 @@ class SelfieDrawingApp:
         lbl_function_buttons.grid(row=0, column=0, pady=5)
 
         # Create a label for the countdown display
-        self.lbl_countdown_display = tk.Label(countdown_frame, text="Countdown: 0s", font=("Arial", 16))
+        self.lbl_countdown_display = tk.Label(countdown_frame, text="Countdown:\n0s", font=("Arial", 24), fg= "red")
         self.lbl_countdown_display.grid(row=4, column=0, columnspan=4, pady=5)
 
         # Create the buttons for taking a picture and resetting
-        # self.btn_capture = tk.Button(button_frame, text="Take Picture", command=lambda: self.image_processor.take_picture(self.canvas_capture, screen_width, screen_height), width=15, height= 5)
         self.btn_capture = tk.Button(button_frame, text="1. Take Selfie", width=15, height=5, relief="raised", bg="#13d12f", fg="#FFFFFF", borderwidth=3, highlightthickness=2)
-        btn_process_img = tk.Button(button_frame, text="2. Process Image", command=lambda: self.process_img(), bg="#0fbd29", fg="#FFFFFF", width=15, height= 5, relief="raised", borderwidth=3, highlightthickness=2)
-        btn_generate_gcode = tk.Button(button_frame, text="3. Confirm", command=lambda: self.generate_gcode(), bg="#0e9c23", fg="#FFFFFF", width=15, height= 5, relief="raised", borderwidth=3, highlightthickness=2)
+        btn_process_img = tk.Button(button_frame, text="2. Process Image", command=lambda: self.process_img(), bg="#0fbd29", fg="#FFFFFF", width=15, height=5, relief="raised", borderwidth=3, highlightthickness=2)
+        btn_generate_gcode = tk.Button(button_frame, text="3. Confirm", command=lambda: self.generate_gcode(), bg="#0e9c23", fg="#FFFFFF", width=15, height=5, relief="raised", borderwidth=3, highlightthickness=2)
 
         self.btn_capture.grid(row=1, column=0, padx=10, pady=10, sticky='ew')  
         btn_process_img.grid(row=2, column=0, padx=10, pady=10, sticky='ew')  
@@ -246,14 +262,6 @@ class SelfieDrawingApp:
 
         # Bind click events to button animations
         self.btn_capture.bind("<ButtonPress-1>", self.button_pressed)
-        
-        # Create frame for copy-right text.
-        cr_frame = tk.Frame(self.tab_take_picture)
-        cr_frame.grid(row=10, column=2, padx=10, pady=10, sticky='ns')
-        
-        # Add copy-right text.
-        copy_right = tk.Label(cr_frame, text="Brought to you by Group 23", font=("Arial", 15))
-        copy_right.grid(row=0, column=0)
 
         #----------------------------------Initialize
         # Initialize captured photo variable
@@ -261,6 +269,8 @@ class SelfieDrawingApp:
 
         # Start the webcam preview
         self.update_preview()
+
+
 
 
     #-------------------- Init Easy Mode
@@ -355,7 +365,7 @@ class SelfieDrawingApp:
             cr_frame.grid(row=10, column=2, padx=10, pady=10, sticky='ns')
             
             # Add copy-right text.
-            copy_right = tk.Label(cr_frame, text="Brought to you by Group 23", font=("Arial", 15))
+            copy_right = tk.Label(cr_frame, text="made by\nLong Thinh Le\nDennis Nguyen\nStewart Kelly\nSamuel Bloomfield", font=("Arial", 15))
             copy_right.grid(row=0, column=0)
             
 
@@ -578,7 +588,7 @@ class SelfieDrawingApp:
         cr_frame.grid(row=10, column=2, padx=10, pady=10, sticky='ns')
         
         # Add copy-right text.
-        copy_right = tk.Label(cr_frame, text="Brought to you by Group 23", font=("Arial", 15))
+        copy_right = tk.Label(cr_frame, text="made by\nLong Thinh Le\nDennis Nguyen\nStewart Kelly\nSamuel Bloomfield", font=("Arial", 15))
         copy_right.grid(row=0, column=0)
 
         #--------------------------------------------- Button Moving X+ Y+ X- Y- TCP
@@ -684,13 +694,14 @@ class SelfieDrawingApp:
             self.ur3_operate.set_pose_goals_list(pose_goal_positions)
             
             # Import Pose Goal position of Frame
-            frame_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'frame_square_150mm.gcode')
+            # frame_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'frame_square_150mm.gcode')
+            frame_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'username.gcode')
             offset_frame_gcode_path = self.offset_gcode(frame_gcode_path, self.desire_x_pos, self.desire_y_pos)
             frame_pose_goal_positions = self.gcode2pose(offset_frame_gcode_path)
             self.ur3_operate.set_frame_pose_goals_list(frame_pose_goal_positions)
 
             # Import Pose Goal position of Signature
-            signature_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'signature_g23.gcode')
+            signature_gcode_path = os.path.join(self.home_directory, 'rs2_ws', 'gcode', 'hashtag.gcode')
             offset_signature_gcode_path = self.offset_gcode(signature_gcode_path, self.desire_x_pos, self.desire_y_pos)
             signature_pose_goal_positions = self.gcode2pose(offset_signature_gcode_path)
             self.ur3_operate.set_signature_pose_goals_list(signature_pose_goal_positions)
@@ -721,6 +732,9 @@ class SelfieDrawingApp:
         self.robot_status_label.config(text="Connected", bg="green")
         self.robot_status_label_easy.config(text="Connected", bg="green")
 
+        self.btn_draw.configure(state=tk.NORMAL, bg= "green")
+        self.btn_stop.configure(state=tk.NORMAL)
+
 
         # Execute the command
         self.process = subprocess.Popen(command)
@@ -742,6 +756,8 @@ class SelfieDrawingApp:
 
         self.robot_status_label.config(text="Connected", bg="green")
         self.robot_status_label_easy.config(text="Connected", bg="green")
+        self.btn_draw.configure(state=tk.NORMAL, bg= "green")
+        self.btn_stop.configure(state=tk.NORMAL)
 
         # # # Execute the command
         self.process = subprocess.Popen(command)
@@ -801,6 +817,8 @@ class SelfieDrawingApp:
         command = ['roslaunch', 'ur_gazebo', 'ur3e_bringup.launch']
         self.robot_type = "ur3e"
         self.robot_status_label.config(text="Connected", bg="green")
+        self.btn_draw.configure(state=tk.NORMAL, bg= "green")
+        self.btn_stop.configure(state=tk.NORMAL)
         # Execute the command
         self.process = subprocess.Popen(command) 
     
@@ -884,20 +902,17 @@ class SelfieDrawingApp:
 
     def start_drawing_easy(self):
         self.homing_ur3()
-        time.sleep(2)
+        self.ur3_operate.completeGoal_flag.wait()
         self.set_origin_ur3()
         print("----------------------\nOrigin is set !\n---------------------------------")
-
-        self.clear_all_goals()
-
         self.open_file_dialog()
-        time.sleep(3)
         self.import_gcode()
-        print("Robot is ready to Draw !")
-        time.sleep(1)
-
-
         if self.gcode_path:
+            print("Robot is ready to Draw!")
+            print("Ready in 2...")
+            time.sleep(1)
+            print("Ready in 1...")
+            time.sleep(1)
             self.start_drawing()
         else: print("Cannot Start the Robot.")
 
@@ -915,7 +930,6 @@ class SelfieDrawingApp:
         self.ur3_operate.release_stop_event()
         time.sleep(0.1)
         self.ur3_operate.homing_ur3()
-        self.ur3_operate.stop_movement()
 
     def release_stop(self):
         self.ur3_operate.release_stop_event()
@@ -999,7 +1013,7 @@ class SelfieDrawingApp:
         count = self.countdown_value
         while count >= 0 and self.running:
             print(f"Countdown now: {count}")
-            self.lbl_countdown_display.config(text=f"Countdown: {count}s")
+            self.lbl_countdown_display.config(text=f"Countdown:\n{count}s")
             time.sleep(1)  # Sleep for 1 second
             count -= 1
 
@@ -1013,7 +1027,7 @@ class SelfieDrawingApp:
         self.update_countdown_display()
 
     def update_countdown_display(self):
-        self.lbl_countdown_display.config(text=f"Countdown: {self.countdown_value}s")
+        self.lbl_countdown_display.config(text=f"Countdown:\n{self.countdown_value}s")
 
 
     #-------------------- Buttons for Image Processing
@@ -1053,12 +1067,17 @@ class SelfieDrawingApp:
         self.image_processor.update_preview(self.canvas_live_camera, self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
 
     def process_img(self):
+        get_name = self.entry_name.get()
+        get_hashtag = self.entry_hashtag.get()
+        self.image_processor.get_user_name(get_name= get_name)
+        self.image_processor.get_hashtag(get_hashtag= get_hashtag)
         self.image_processor.process_img(self.canvas_processed_image, self.canvas_traced_outline_image)
 
     #--------------------- Buttons for Gcode processing
 
     def generate_gcode(self): # convert SVG file to Gcode
         self.gcode_processor.generate_gcode()
+        self.gcode_processor.generate_gcode_text()
 
 
     def offset_gcode(self, gcode_path, offset_x, offset_y):
