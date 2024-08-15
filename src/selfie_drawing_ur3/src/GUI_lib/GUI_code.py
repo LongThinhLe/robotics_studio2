@@ -316,7 +316,7 @@ class SelfieDrawingApp:
             self.ip_entry.pack(side=tk.LEFT, padx=10)
             
             # Set the initial value of the entry widget
-            self.ip_entry.insert(0, "192.168.1.102") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
+            self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
 
             # Create a button to connect
             self.connect_button_easy = tk.Button(ip_frame, text="1. Connect", font=("Arial", 16), command= lambda: self.connect_to_robot_easy(), relief="raised", borderwidth=3, highlightthickness=2)
@@ -412,7 +412,7 @@ class SelfieDrawingApp:
         self.ip_entry.pack(side=tk.LEFT, padx=10)
 
         # Set the initial value of the entry widget
-        self.ip_entry.insert(0, "192.168.1.102") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
+        self.ip_entry.insert(0, "192.168.1.104") # 192.168.0.250 # ur3e 192.168.1.102 150.22.0.250
 
         # Create a button to connect
         self.connect_button = tk.Button(ip_frame, text="Connect", font=("Arial", 16), command= lambda: self.connect_to_robot())

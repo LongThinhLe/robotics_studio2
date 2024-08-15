@@ -267,7 +267,7 @@ class GcodeProcessing:
                     # Extract X,Y coordinates from the gcode file
                     x = float(line.split('X')[1].split(' ')[0])
                     y = float(line.split('Y')[1].split(' ')[0])
-                    z = 0.145 + 9.2/1000 # 0.16
+                    z = 0.152 # + 9.2/1000 # 0.16
                     pose_goal_positions.append([x,y,z])
 
                 elif line.startswith('G1'):
@@ -275,15 +275,12 @@ class GcodeProcessing:
                     x = float(line.split('X')[1].split(' ')[0])
                     y = float(line.split('Y')[1].split(' ')[0])
                     if robot_type == "ur3e":
-                          z = 0.138  + 9.2/1000    # 0.135 ur3: 0.125 #ur3e: 0.13 # go up
-                    else: z = 0.1285 + 9.2/1000    # 0.1285 go down
+                          z = 0.1465 # 0.138  + 9.2/1000    # 0.135 ur3: 0.125 #ur3e: 0.13 # go up
+                    else: z = 0.1465 # 0.1285 + 9.2/1000    # 0.1285 go down
                     pose_goal_positions.append([x,y,z])
 
         return pose_goal_positions
     
-
-
-
 
 
 

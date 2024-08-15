@@ -29,6 +29,7 @@ class ImageProcessor:
         # Initialize Webcam
         # Iterate through device indexes until a valid one is found
         for i in range(10):  # Try up to 10 devices
+            # if i == 0: continue
             cap = cv2.VideoCapture(i)
             if cap.isOpened():
                 self.cap = cap
@@ -340,7 +341,7 @@ class ImageProcessor:
 
     def add_centered_text(self, svg, text, y_position, min_x, max_x): # FONT SIZE HERE
         # Calculate the text width approximately based on the number of characters and font size
-        font_size = 9  # Assuming a fixed font size; you can adjust as needed
+        font_size = 12  # Assuming a fixed font size; you can adjust as needed
         char_width = font_size * 0.6  # Average character width as a fraction of the font size
         text_width = len(text) * char_width
 
