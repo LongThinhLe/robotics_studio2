@@ -15,6 +15,11 @@ import numpy as np
 from imutils import face_utils
 
 
+from skimage import io as skimage_io
+from skimage import morphology
+from skimage.color import rgb2gray
+import xml.etree.ElementTree as ET
+
 class ImageProcessor:
     # Set constant for enabling Camera
     CAMERA_ENABLE = True
@@ -173,8 +178,7 @@ class ImageProcessor:
         print("\nRemoved background image:", store_path) 
 
 
-
-
+## EXPERIMENT:
 
 
     def trace_outline(self, canvas_traced_outline_image): # GOOD 
@@ -192,22 +196,28 @@ class ImageProcessor:
         gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2GRAY)
 
         # Apply Gaussian blur to reduce noise and enhance feature detection
-        blurred_image = cv2.GaussianBlur(gray_image, (7, 7), 0)
+        blurred_image = cv2.GaussianBlur(gray_image, (11, 7), 0) # 7,7 # 9, 7
 
-        # Apply Canny edge detection
-        # threshold 1: IF the gradient magnitude is below this threshold, it is considered not an edge
-        # threshold 2: IF the gradient mangitude is above this threshold, it is considered an edge
+        # # Apply thresholding to create a binary image
+        # _, binary_image = cv2.threshold(blurred_image, 128, 255, cv2.THRESH_BINARY_INV)
+
+        # # Apply Canny edge detection
+        # # threshold 1: IF the gradient magnitude is below this threshold, it is considered not an edge
+        # # threshold 2: IF the gradient mangitude is above this threshold, it is considered an edge
         edges = cv2.Canny(blurred_image, 10, 255) # 100, 255
 
-        # Find contours
+        # # Find contours
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
 
         # Create SVG object
         svg = svgwrite.Drawing(output_svg_path, profile='tiny')
 
         # Smoothness parameter for contour approximation
         svg_resolution = 0.0005  # Adjust this value for desired smoothness # Keep this value 0.0005
-        
+    
+
+
         # Iterate through contours
         for contour in contours:
             # Calculate contour area
@@ -308,10 +318,6 @@ class ImageProcessor:
                 if feature_name in ["left_eye", "right_eye"]:
                     retina_points = self.create_circle(eye_center.astype(int), 2)
                     svg.add(svg.polyline(retina_points, stroke="black", fill="none"))
-
-
-
-
         #------------------------------------------- Text input
         if self.user_name:
             username = self.user_name
@@ -320,18 +326,57 @@ class ImageProcessor:
             self.add_text_to_svg(hashtag, svg, 5, 200, 40)
 
 
-
-
         # Set the size of the SVG drawing
         svg['width'] = self.SVG_WIDTH  # Set the width of the SVG 640px
         svg['height'] = self.SVG_HEIGHT  # Set the height of the SVG 480px
         # Save SVG file
         svg.save()
+
+        # Now process the outline to create a centerline
+        # self.create_centerline_from_outline(output_svg_path)
+
         # --------------------------------------- Display SVG to Canvas
         # Display the processed image
         self.display_trace_outline(canvas_traced_outline_image)
         print("\nSVG image saved:", output_svg_path)
 
+
+    #--------------------- FUNCTIONS EXPERIMENT
+    def create_centerline_from_outline(self, output_svg_path):
+        # Render the SVG to a PNG image using cairosvg at a high resolution
+        file_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
+        with open(file_path, "rb") as f:
+            svg_data = f.read()
+
+        png_data = cairosvg.svg2png(bytestring=svg_data)
+        image = Image.open(io.BytesIO(png_data))
+        image_np = np.array(image)
+
+        # Convert the image to grayscale
+        gray_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+
+        # Binarize the image
+        _, binary_image = cv2.threshold(gray_image, 1, 255, cv2.THRESH_BINARY)
+
+        # Invert the binary image
+        inverted_binary_image = cv2.bitwise_not(binary_image)
+
+        # Skeletonize the binary image to get the centerline
+        skeleton = morphology.skeletonize(inverted_binary_image > 0)
+
+        # Find contours of the skeleton
+        contours, _ = cv2.findContours(skeleton.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Create a new SVG object for the centerline
+        svg = svgwrite.Drawing(output_svg_path, profile='tiny', size=('640px', '480px'))
+
+        # Iterate through contours and add to SVG
+        for contour in contours:
+            points = [(int(point[0][0] / 3.125), int(point[0][1] / 3.125)) for point in contour]  # Scale back down to original SVG size
+            svg.add(svg.polyline(points, stroke="black", fill="none"))
+
+        # Save the new SVG file with centerline tracing
+        svg.save()
 #------------------------------------ END FUNCTION IMAGE PROCESSING
 
  
@@ -454,152 +499,3 @@ class ImageProcessor:
 
 
 
-
-
-#### BACK UP SUPER GOOD
-    # def trace_outline(self, canvas_traced_outline_image): # GOOD 
-    #     # Check if the captured image exists
-    #     file_path = os.path.join(self.home_directory, "rs2_ws", "img", "captured_picture_rmbg.png")
-    #     if not os.path.exists(file_path):
-    #         print("Image not found.")
-    #         return
-
-    #     output_svg_path = os.path.join(self.home_directory, "rs2_ws", "img", "outline_picture_rmbg.svg")
-
-    #     # ------------------------------------------------------- 
-    #     # Read the RGB image and convert it to grayscale
-    #     rgb_image = cv2.imread(file_path)
-    #     gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2GRAY)
-
-    #     # Apply Gaussian blur to reduce noise and enhance feature detection
-    #     blurred_image = cv2.GaussianBlur(gray_image, (7, 7), 0)
-
-    #     # Apply Canny edge detection
-    #     # threshold 1: IF the gradient magnitude is below this threshold, it is considered not an edge
-    #     # threshold 2: IF the gradient mangitude is above this threshold, it is considered an edge
-    #     edges = cv2.Canny(blurred_image, 200, 255) # 100, 255
-
-    #     # Find contours
-    #     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    #     # Create SVG object
-    #     svg = svgwrite.Drawing(output_svg_path, profile='tiny')
-
-    #     # Smoothness parameter for contour approximation
-    #     svg_resolution = 0.0005  # Adjust this value for desired smoothness # Keep this value 0.0005
-        
-    #     # Iterate through contours
-    #     for contour in contours:
-    #         # Calculate contour area
-    #         area = cv2.contourArea(contour)
-            
-    #         # Define minimum area threshold to keep contour
-    #         min_area_threshold = 10  # Adjust this threshold as needed
-            
-    #         # If contour area is above threshold, keep it
-    #         if area > min_area_threshold:
-    #             # Approximate contour to reduce points
-    #             epsilon = svg_resolution * cv2.arcLength(contour, True)
-    #             approx = cv2.approxPolyDP(contour, epsilon, True)
-
-    #             # Convert contour points to SVG format
-    #             points = [(int(point[0][0]), int(point[0][1])) for point in approx]
-    #             smoothed_points = self.chaikin_smoothing(points, iterations= 2)
-    #             reduced_points = self.rdp(smoothed_points, minimum_length= 1.5)
-    #             svg.add(svg.polyline(reduced_points, stroke="black", fill="none"))
-
-
-    #     # Define indices for each facial feature
-    #     features = {
-    #         "jaw": list(range(0, 17)),
-    #         "left_eyebrow": list(range(17, 22)),
-    #         "right_eyebrow": list(range(22, 27)),
-    #         "nose": list(range(28, 36)),
-    #         "left_eye": list(range(36, 42)),
-    #         "right_eye": list(range(42, 48)),
-    #         "outer_mouth": list(range(48, 60)),
-    #         "inner_mouth": list(range(60, 68))
-    #     }
-
-    #     # Detect faces in the grayscale image
-    #     rects = self.detector(gray_image, 0)
-
-    #     # Process each face detection for facial landmarks
-    #     for rect in rects:
-    #         shape = self.predictor(gray_image, rect)
-    #         shape = face_utils.shape_to_np(shape)
-
-    #         # Interpolate points to increase resolution
-    #         for feature_name, indices in features.items():
-    #             feature_points = shape[indices]
-    #             points = [(int(x), int(y)) for (x, y) in feature_points]
-
-    #             # Close the loops for eyebrows
-    #             if feature_name in ["left_eyebrow", "right_eyebrow"]:
-    #                 # Compute the control point for curvature
-    #                 x_coords = [p[0] for p in points]
-    #                 y_coords = [p[1] for p in points]
-    #                 mid_x = sum(x_coords) / len(x_coords)
-    #                 mid_y = min(y_coords) + 1  # Adjust -10 to control the upward curvature
-
-    #                 control_point = (mid_x, mid_y)
-    #                 d = f"M {points[0][0]},{points[0][1]} "
-
-    #                 # Add line segments for all points except the closing curve
-    #                 for i in range(1, len(points)):
-    #                     d += f"L {points[i][0]},{points[i][1]} "
-
-    #                 # Add the closing curve
-    #                 d += f"Q {control_point[0]},{control_point[1]} {points[0][0]},{points[0][1]}"
-    #                 svg.add(svg.path(d, stroke="black", fill="none"))
-
-
-    #             # Make eyes loops bigger by scaling points around the center
-    #             if feature_name in ["left_eye", "right_eye"]:
-    #                 eye_center = np.mean(feature_points, axis=0)
-    #                 # Scale the points around the center for larger loops
-    #                 scaled_points = [(int(eye_center[0] + 1.5 * (x - eye_center[0])), int(eye_center[1] + 1.5 * (y - eye_center[1]))) for (x, y) in feature_points]
-                    
-    #                 # Prepare the path for cubic Bezier curve
-    #                 d = f"M {scaled_points[0][0]},{scaled_points[0][1]} "
-    #                 num_points = len(scaled_points)
-                    
-    #                 for i in range(num_points):
-    #                     p0 = scaled_points[i]
-    #                     p1 = scaled_points[(i + 1) % num_points]
-    #                     cp1 = (int((2 * p0[0] + p1[0]) / 3), int((2 * p0[1] + p1[1]) / 3))
-    #                     cp2 = (int((p0[0] + 2 * p1[0]) / 3), int((p0[1] + 2 * p1[1]) / 3))
-                        
-    #                     d += f"C {cp1[0]},{cp1[1]} {cp2[0]},{cp2[1]} {p1[0]},{p1[1]} "
-                    
-    #                 svg.add(svg.path(d, stroke="black", fill="none"))
-                    
-    #                 # Create retinas for eyes
-    #                 retina_points = self.create_circle(eye_center.astype(int), 2) # Adjust here for Retina's radius
-    #                 svg.add(svg.polyline(retina_points, stroke="black", fill="none"))
-
-
-    #             # Close the loop for mouth
-    #             if feature_name in ["outer_mouth", "inner_mouth"]:
-    #                 points.append(points[0])  # Close the loop
-
-    #             svg.add(svg.polyline(points, stroke="black", fill="none"))
-
-    #             # Create retinas for eyes
-    #             if feature_name in ["left_eye", "right_eye"]:
-    #                 retina_points = self.create_circle(eye_center.astype(int), 2)
-    #                 svg.add(svg.polyline(retina_points, stroke="black", fill="none"))
-
-    #     # Set the size of the SVG drawing
-    #     svg['width'] = '640px'  # Set the width of the SVG
-    #     svg['height'] = '480px'  # Set the height of the SVG
-
-    #     # Save SVG file
-    #     svg.save()
-
-    #     # ---------------------------------------
-
-
-    #     # Display the processed image
-    #     self.display_trace_outline(canvas_traced_outline_image)
-    #     print("\nSVG image saved:", output_svg_path)

@@ -110,9 +110,6 @@ class GcodeProcessing:
                 self.save_gcode_to_file(gcode, output_gcode_file)
                 print(f"G-code for text element {i+1} successfully generated and saved to {output_gcode_file}.")
 
-
-
-
     def save_gcode_to_file(self, gcode, output_file):
         with open(output_file, 'w') as f:
             for line in gcode:
@@ -281,33 +278,3 @@ class GcodeProcessing:
 
         return pose_goal_positions
     
-
-
-
-# BACK UP 
-    # def convert_svg_text_to_gcode(self, svg_file): JUST FOR 1 TEXT GCODE FILE
-    #     y_offset = 0 # OFFSET TEXT HERE 55
-
-    #     text_elements, root, ns = self.parse_svg_for_text(svg_file)
-        
-    #     font_properties = FontProperties(family="Helvetica", weight="light")
-    #     all_polygons = []
-    #     for text_elem in text_elements:
-    #         polygons = self.text_to_path(text_elem, font_properties)
-    #         all_polygons.extend(polygons)
-
-    #     # Get bounding box and calculate the center
-    #     min_x, max_x, min_y, max_y = self.get_bounding_box(all_polygons)
-    #     center_x = (min_x + max_x) / 2
-    #     center_y = (min_y + max_y) / 2
-
-    #     # Translate polygons to origin
-    #     translated_polygons = self.translate_polygons_to_origin(all_polygons, center_x, center_y - y_offset)
-        
-    #     path_data_list = self.text_polygons_to_svg_path_data(translated_polygons)
-
-    #     gcode = []
-    #     for path_data in path_data_list:
-    #         gcode.extend(self.svg_path_to_gcode(path_data))
-
-    #     return gcode
